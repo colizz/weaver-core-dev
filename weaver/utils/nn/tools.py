@@ -45,6 +45,11 @@ def train_classification(model, loss_func, opt, scheduler, train_loader, dev, ep
         for X, y, _ in tq:
             inputs = [X[k].to(dev) for k in data_config.input_names]
             label = y[data_config.label_names[0]].long()
+            # for i in range(24):
+            #     print(sum(label==i).item(), end='/')
+            # print()
+            # for i in range(25):
+            #     print(i, inputs[1][0][i])
             try:
                 label_mask = y[data_config.label_names[0] + '_mask'].bool()
             except KeyError:
@@ -452,6 +457,265 @@ def evaluate_regression(model, test_loader, dev, epoch, for_training=True, loss_
         return total_loss / count, scores, labels, observers
 
 
+def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, steps_per_epoch=None, grad_scaler=None, tb_helper=None):
+    model.train()
+
+    data_config = train_loader.dataset.config
+
+    label_counter = Counter()
+    total_loss = 0
+    total_loss_cls = 0
+    total_loss_reg = 0
+    num_batches = 0
+    total_correct = 0
+    sum_abs_err = 0
+    sum_sqr_err = 0
+    count = 0
+    start_time = time.time()
+    with tqdm.tqdm(train_loader) as tq:
+        for X, y, _ in tq:
+            inputs = [X[k].to(dev) for k in data_config.input_names]
+            # for classification
+            label_cls = y['_label_'].long()
+            try:
+                label_mask = y['_label_mask'].bool()
+            except KeyError:
+                label_mask = None
+            label_cls = _flatten_label(label_cls, label_mask)
+            label_counter.update(label_cls.cpu().numpy())
+            label_cls = label_cls.to(dev)
+
+            # for regression
+            label_reg = y[data_config.label_names[-1]].float().to(dev)
+
+            num_examples = label_reg.shape[0]
+            opt.zero_grad()
+            with torch.cuda.amp.autocast(enabled=grad_scaler is not None):
+                model_output = model(*inputs)
+                logits = _flatten_preds(model_output[:, :-1], label_mask)
+                preds_reg = model_output[:, -1]
+                loss, loss_monitor = loss_func(logits, preds_reg, label_cls, label_reg)
+            if grad_scaler is None:
+                loss.backward()
+                opt.step()
+            else:
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(opt)
+                grad_scaler.update()
+
+            if scheduler and getattr(scheduler, '_update_per_step', False):
+                scheduler.step()
+
+            _, preds_cls = logits.max(1)
+            loss = loss.item()
+
+            num_batches += 1
+            count += num_examples
+            correct = (preds_cls == label_cls).sum().item()
+ 
+            total_loss += loss
+            total_loss_cls += loss_monitor['cls']
+            total_loss_reg += loss_monitor['reg']
+            total_correct += correct
+
+            e = preds_reg - label_reg
+            abs_err = e.abs().sum().item()
+            sum_abs_err += abs_err
+            sqr_err = e.square().sum().item()
+            sum_sqr_err += sqr_err
+
+            tq.set_postfix({
+                'lr': '%.2e' % scheduler.get_last_lr()[0] if scheduler else opt.defaults['lr'],
+                'Loss': '%.5f' % loss_monitor['cls'],
+                'LossReg': '%.5f' % loss_monitor['reg'],
+                'LossTot': '%.5f' % loss,
+                'AvgLoss': '%.5f' % (total_loss / num_batches),
+                'Acc': '%.5f' % (correct / num_examples),
+                'AvgAcc': '%.5f' % (total_correct / count),
+                'MSE': '%.5f' % (sqr_err / num_examples),
+                'AvgMSE': '%.5f' % (sum_sqr_err / count),
+                'MAE': '%.5f' % (abs_err / num_examples),
+                'AvgMAE': '%.5f' % (sum_abs_err / count),
+            })
+
+            if tb_helper:
+                tb_helper.write_scalars([
+                    ("Loss/train", loss_monitor['cls'], tb_helper.batch_train_count + num_batches), # to compare cls loss to previous loss
+                    ("LossReg/train", loss_monitor['reg'], tb_helper.batch_train_count + num_batches),
+                    # ("LossTot/train", loss, tb_helper.batch_train_count + num_batches),
+                    ("Acc/train", correct / num_examples, tb_helper.batch_train_count + num_batches),("Acc/train", correct / num_examples, tb_helper.batch_train_count + num_batches),
+                    ("MSE/train", sqr_err / num_examples, tb_helper.batch_train_count + num_batches),
+                    # ("MAE/train", abs_err / num_examples, tb_helper.batch_train_count + num_batches),
+                    ])
+                if tb_helper.custom_fn:
+                    with torch.no_grad():
+                        tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=num_batches, mode='train')
+
+            if steps_per_epoch is not None and num_batches >= steps_per_epoch:
+                break
+
+    time_diff = time.time() - start_time
+    _logger.info('Processed %d entries in total (avg. speed %.1f entries/s)' % (count, count / time_diff))
+    _logger.info('Train AvgLoss: %.5f, AvgLossReg: %.5f, AvgLossTot: %.5f, AvgAcc: %.5f, AvgMSE: %.5f, AvgMAE: %.5f' %
+                 (total_loss_cls / num_batches, total_loss_reg / num_batches, total_loss / num_batches,
+                 total_correct / count, sum_sqr_err / count, sum_abs_err / count))
+    _logger.info('Train class distribution: \n    %s', str(sorted(label_counter.items())))
+
+    if tb_helper:
+        tb_helper.write_scalars([
+            ("Loss/train (epoch)", total_loss_cls / num_batches, epoch), # to compare cls loss to previous loss
+            ("LossReg/train (epoch)", total_loss_reg / num_batches, epoch),
+            ("LossTot/train (epoch)", total_loss / num_batches, epoch),
+            ("Acc/train (epoch)", total_correct / count, epoch),
+            ("MSE/train (epoch)", sum_sqr_err / count, epoch),
+            ("MAE/train (epoch)", sum_abs_err / count, epoch),
+            ])
+        if tb_helper.custom_fn:
+            with torch.no_grad():
+                tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=-1, mode='train')
+        # update the batch state
+        tb_helper.batch_train_count += num_batches
+
+    if scheduler and not getattr(scheduler, '_update_per_step', False):
+        scheduler.step()
+
+
+def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func=None, steps_per_epoch=None,
+                        eval_metrics_cls=['roc_auc_score', 'roc_auc_score_matrix', 'confusion_matrix'],
+                        eval_metrics_reg=['mean_squared_error', 'mean_absolute_error', 'median_absolute_error',
+                                          'mean_gamma_deviance'],
+                        tb_helper=None):
+    model.eval()
+
+    data_config = test_loader.dataset.config
+
+    label_counter = Counter()
+    total_loss = 0
+    total_loss_cls = 0
+    total_loss_reg = 0
+    num_batches = 0
+    total_correct = 0
+    entry_count = 0
+    sum_sqr_err = 0
+    sum_abs_err = 0
+    count = 0
+    scores_cls = []
+    scores_reg = []
+    labels = defaultdict(list)
+    labels_counts = []
+    observers = defaultdict(list)
+    start_time = time.time()
+    with torch.no_grad():
+        with tqdm.tqdm(test_loader) as tq:
+            for X, y, Z in tq:
+                inputs = [X[k].to(dev) for k in data_config.input_names]
+                # for classification
+                label_cls = y['_label_'].long()
+                entry_count += label_cls.shape[0]
+                try:
+                    label_mask = y['_label_mask'].bool()
+                except KeyError:
+                    label_mask = None
+                if not for_training and label_mask is not None:
+                    labels_counts.append(np.squeeze(label_mask.numpy().sum(axis=-1)))
+                label_clslabel_cls = _flatten_label(label_cls, label_mask)
+                num_examples = label_cls.shape[0]
+                label_counter.update(label_cls.cpu().numpy())
+                label_cls = label_cls.to(dev)
+
+                # for regression
+                label_reg = y[data_config.label_names[-1]].float().to(dev)
+
+                model_output = model(*inputs)
+                logits = _flatten_preds(model_output[:, :-1], label_mask).float()
+                preds_reg = model_output[:, -1].float()
+
+                scores_cls.append(torch.softmax(logits, dim=1).detach().cpu().numpy())
+                scores_reg.append(preds_reg.detach().cpu().numpy())
+                for k, v in y.items():
+                    if k == '_label_':
+                        labels[k].append(_flatten_label(v, label_mask).cpu().numpy())
+                    else:
+                        labels[k].append(v.cpu().numpy())
+                if not for_training:
+                    for k, v in Z.items():
+                        observers[k].append(v.cpu().numpy())
+
+                _, preds_cls = logits.max(1)
+                loss, loss_monitor = loss_func(logits, preds_reg, label_cls, label_reg)
+                loss = loss.item()
+
+                num_batches += 1
+                count += num_examples
+                correct = (preds_cls == label_cls).sum().item()
+                total_correct += correct
+                total_loss += loss * num_examples
+                total_loss_cls += loss_monitor['cls'] * num_examples
+                total_loss_reg += loss_monitor['reg'] * num_examples
+                e = preds_reg - label_reg
+                abs_err = e.abs().sum().item()
+                sum_abs_err += abs_err
+                sqr_err = e.square().sum().item()
+                sum_sqr_err += sqr_err
+
+                tq.set_postfix({
+                    'Loss': '%.5f' % loss_monitor['cls'],
+                    'LossReg': '%.5f' % loss_monitor['reg'],
+                    'LossTot': '%.5f' % loss,
+                    'AvgLoss': '%.5f' % (total_loss / count),
+                    'Acc': '%.5f' % (correct / num_examples),
+                    'AvgAcc': '%.5f' % (total_correct / count),
+                    'MSE': '%.5f' % (sqr_err / num_examples),
+                    'AvgMSE': '%.5f' % (sum_sqr_err / count),
+                    'MAE': '%.5f' % (abs_err / num_examples),
+                    'AvgMAE': '%.5f' % (sum_abs_err / count),
+                })
+
+                if tb_helper:
+                    if tb_helper.custom_fn:
+                        with torch.no_grad():
+                            tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=num_batches,
+                                                mode='eval' if for_training else 'test')
+
+                if steps_per_epoch is not None and num_batches >= steps_per_epoch:
+                    break
+
+    time_diff = time.time() - start_time
+    _logger.info('Processed %d entries in total (avg. speed %.1f entries/s)' % (count, count / time_diff))
+    _logger.info('Evaluation class distribution: \n    %s', str(sorted(label_counter.items())))
+
+    if tb_helper:
+        tb_mode = 'eval' if for_training else 'test'
+        tb_helper.write_scalars([
+            ("Loss/%s (epoch)" % tb_mode, total_loss_cls / count, epoch),
+            ("LossReg/%s (epoch)" % tb_mode, total_loss_reg / count, epoch),
+            ("LossTot/%s (epoch)" % tb_mode, total_loss / count, epoch),
+            ("Acc/%s (epoch)" % tb_mode, total_correct / count, epoch),
+            ("MSE/%s (epoch)" % tb_mode, sum_sqr_err / count, epoch),
+            ("MAE/%s (epoch)" % tb_mode, sum_abs_err / count, epoch),
+            ])
+        if tb_helper.custom_fn:
+            with torch.no_grad():
+                tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=-1, mode=tb_mode)
+
+    scores_cls = np.concatenate(scores_cls)
+    scores_reg = np.concatenate(scores_reg)
+    labels = {k: _concat(v) for k, v in labels.items()}
+    metric_results_cls = evaluate_metrics(labels['_label_'], scores_cls, eval_metrics=eval_metrics_cls)
+    metric_results_reg = evaluate_metrics(labels[data_config.label_names[-1]], scores_reg, eval_metrics=eval_metrics_reg)
+    _logger.info('Evaluation metric for cls: \n%s', '\n'.join(
+        ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results_cls.items()]))
+    _logger.info('Evaluation metrics for reg: \n%s', '\n'.join(
+        ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results_reg.items()]))
+
+    if for_training:
+        return total_loss / count
+    else:
+        # convert 2D labels/scores
+        observers = {k: _concat(v) for k, v in observers.items()}
+        return total_loss / count, scores_reg, labels, observers
+
+
 class TensorboardHelper(object):
 
     def __init__(self, tb_comment, tb_custom_fn):
@@ -466,7 +730,7 @@ class TensorboardHelper(object):
         # load custom function
         self.custom_fn = tb_custom_fn
         if self.custom_fn is not None:
-            from weaver.utils.import_tools import import_module
+            from utils.import_tools import import_module
             from functools import partial
             self.custom_fn = import_module(self.custom_fn, '_custom_fn')
             self.custom_fn = partial(self.custom_fn.get_tensorboard_custom_fn, tb_writer=self.writer)

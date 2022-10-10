@@ -93,14 +93,17 @@ class DataConfig(object):
         # labels
         self.label_type = opts['labels']['type']
         self.label_value = opts['labels']['value']
-        if self.label_type == 'simple':
+        self.label_value_custom = opts['labels']['value_custom'] if self.label_type == 'hybrid' else opts['labels']['value']
+        self.label_names = []
+        if self.label_type in ['simple', 'hybrid']:
             assert(isinstance(self.label_value, list))
-            self.label_names = ('_label_',)
+            self.label_names.extend(['_label_'])
             self.var_funcs['_label_'] = 'np.argmax(np.stack([%s], axis=1), axis=1)' % (','.join(self.label_value))
             self.var_funcs['_labelcheck_'] = 'np.sum(np.stack([%s], axis=1), axis=1)' % (','.join(self.label_value))
-        else:
-            self.label_names = tuple(self.label_value.keys())
-            self.var_funcs.update(self.label_value)
+        if self.label_type in ['custom', 'hybrid']:
+            self.label_names.extend(list(self.label_value_custom.keys()))
+            self.var_funcs.update(self.label_value_custom)
+        self.label_names = tuple(self.label_names)
         self.basewgt_name = '_basewgt_'
         self.weight_name = None
         if opts['weights'] is not None:

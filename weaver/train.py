@@ -12,13 +12,14 @@ import math
 import torch
 
 from torch.utils.data import DataLoader
-from weaver.utils.logger import _logger, _configLogger
-from weaver.utils.dataset import SimpleIterDataset
-from weaver.utils.import_tools import import_module
+from utils.logger import _logger, _configLogger
+from utils.dataset import SimpleIterDataset
+from utils.import_tools import import_module
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--regression-mode', action='store_true', default=False,
-                    help='run in regression mode if this flag is set; otherwise run in classification mode')
+parser.add_argument('--train-mode', type=str, default='cls',
+                    choices=['cls', 'regression', 'hybrid'],
+                    help='training mode')
 parser.add_argument('-c', '--data-config', type=str, default='data/ak15_points_pf_sv_v0.yaml',
                     help='data config YAML file')
 parser.add_argument('-i', '--data-train', nargs='*', default=[],
@@ -339,7 +340,7 @@ def flops(model, model_info):
     :param model_info:
     :return:
     """
-    from weaver.utils.flops_counter import get_model_complexity_info
+    from utils.flops_counter import get_model_complexity_info
     import copy
 
     model = copy.deepcopy(model).cpu()
@@ -453,7 +454,7 @@ def optim(args, model, device):
         parameters = model.parameters()
 
     if args.optimizer == 'ranger':
-        from weaver.utils.nn.optimizer.ranger import Ranger
+        from utils.nn.optimizer.ranger import Ranger
         opt = Ranger(parameters, lr=args.start_lr, **optimizer_options)
     elif args.optimizer == 'adam':
         opt = torch.optim.Adam(parameters, lr=args.start_lr, **optimizer_options)
@@ -571,7 +572,7 @@ def iotest(args, data_loader):
     """
     from tqdm.auto import tqdm
     from collections import defaultdict
-    from weaver.utils.data.tools import _concat
+    from utils.data.tools import _concat
     _logger.info('Start running IO test')
     monitor_info = defaultdict(list)
 
@@ -596,9 +597,9 @@ def save_root(args, output_path, data_config, scores, labels, observers):
     :param observers
     :return:
     """
-    from weaver.utils.data.fileio import _write_root
+    from utils.data.fileio import _write_root
     output = {}
-    if args.regression_mode:
+    if args.train_mode == 'regression':
         output[data_config.label_names[0]] = labels[data_config.label_names[0]]
         output['output'] = scores
     else:
@@ -642,14 +643,18 @@ def _main(args):
         _logger.warning('Use of `file-fraction` is not recommended in general -- prefer using `data-fraction` instead.')
 
     # classification/regression mode
-    if args.regression_mode:
+    if args.train_mode == 'regression':
         _logger.info('Running in regression mode')
-        from weaver.utils.nn.tools import train_regression as train
-        from weaver.utils.nn.tools import evaluate_regression as evaluate
+        from utils.nn.tools import train_regression as train
+        from utils.nn.tools import evaluate_regression as evaluate
+    elif args.train_mode == 'hybrid':
+        _logger.info('Running in hybrid mode')
+        from utils.nn.tools import train_hybrid as train
+        from utils.nn.tools import evaluate_hybrid as evaluate
     else:
         _logger.info('Running in classification mode')
-        from weaver.utils.nn.tools import train_classification as train
-        from weaver.utils.nn.tools import evaluate_classification as evaluate
+        from utils.nn.tools import train_classification as train
+        from utils.nn.tools import evaluate_classification as evaluate
 
     # training/testing mode
     training_mode = not args.predict
@@ -701,7 +706,7 @@ def _main(args):
         return
 
     if args.tensorboard:
-        from weaver.utils.nn.tools import TensorboardHelper
+        from utils.nn.tools import TensorboardHelper
         tb = TensorboardHelper(tb_comment=args.tensorboard, tb_custom_fn=args.tensorboard_custom_fn)
     else:
         tb = None
@@ -731,7 +736,7 @@ def _main(args):
         # lr finder: keep it after all other setups
         if args.lr_finder is not None:
             start_lr, end_lr, num_iter = args.lr_finder.replace(' ', '').split(',')
-            from weaver.utils.lr_finder import LRFinder
+            from utils.lr_finder import LRFinder
             lr_finder = LRFinder(model, opt, loss_func, device=dev, input_names=train_input_names,
                                  label_names=train_label_names)
             lr_finder.range_test(train_loader, start_lr=float(start_lr), end_lr=float(end_lr), num_iter=int(num_iter))
@@ -739,7 +744,7 @@ def _main(args):
             return
 
         # training loop
-        best_valid_metric = np.inf if args.regression_mode else 0
+        best_valid_metric = np.inf if args.train_mode in ['regression', 'hybrid'] else 0
         grad_scaler = torch.cuda.amp.GradScaler() if args.use_amp else None
         for epoch in range(args.num_epochs):
             if args.load_epoch is not None:
@@ -765,7 +770,7 @@ def _main(args):
             valid_metric = evaluate(model, val_loader, dev, epoch, loss_func=loss_func,
                                     steps_per_epoch=args.steps_per_epoch_val, tb_helper=tb)
             is_best_epoch = (
-                valid_metric < best_valid_metric) if args.regression_mode else(
+                valid_metric < best_valid_metric) if args.train_mode in ['regression', 'hybrid'] else(
                 valid_metric > best_valid_metric)
             if is_best_epoch:
                 best_valid_metric = valid_metric
@@ -804,7 +809,7 @@ def _main(args):
             # run prediction
             if args.model_prefix.endswith('.onnx'):
                 _logger.info('Loading model %s for eval' % args.model_prefix)
-                from weaver.utils.nn.tools import evaluate_onnx
+                from utils.nn.tools import evaluate_onnx
                 test_metric, scores, labels, observers = evaluate_onnx(args.model_prefix, test_loader)
             else:
                 test_metric, scores, labels, observers = evaluate(
