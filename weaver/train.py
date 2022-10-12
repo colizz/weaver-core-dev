@@ -599,13 +599,14 @@ def save_root(args, output_path, data_config, scores, labels, observers):
     """
     from utils.data.fileio import _write_root
     output = {}
-    if args.train_mode == 'regression':
-        output[data_config.label_names[0]] = labels[data_config.label_names[0]]
-        output['output'] = scores
-    else:
+    scores_cls, scores_reg = (scores, None) if args.train_mode == 'cls' else (None, scores) if args.train_mode == 'regression' else scores
+    if args.train_mode in ['regression', 'hybrid']:
+        output[data_config.label_names[-1]] = labels[data_config.label_names[-1]]
+        output['output'] = scores_reg
+    if args.train_mode in ['cls', 'hybrid']:
         for idx, label_name in enumerate(data_config.label_value):
             output[label_name] = (labels[data_config.label_names[0]] == idx)
-            output['score_' + label_name] = scores[:, idx]
+            output['score_' + label_name] = scores_cls[:, idx]
     for k, v in labels.items():
         if k == data_config.label_names[0]:
             continue

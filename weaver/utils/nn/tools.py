@@ -642,8 +642,11 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
                         observers[k].append(v.cpu().numpy())
 
                 _, preds_cls = logits.max(1)
-                loss, loss_monitor = loss_func(logits, preds_reg, label_cls, label_reg)
-                loss = loss.item()
+                if loss_func is not None:
+                    loss, loss_monitor = loss_func(logits, preds_reg, label_cls, label_reg)
+                    loss = loss.item()
+                else:
+                    loss, loss_monitor = 0., {'cls': 0., 'reg': 0.}
 
                 num_batches += 1
                 count += num_examples
@@ -713,7 +716,7 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
     else:
         # convert 2D labels/scores
         observers = {k: _concat(v) for k, v in observers.items()}
-        return total_loss / count, scores_reg, labels, observers
+        return total_loss / count, (scores_cls, scores_reg), labels, observers
 
 
 class TensorboardHelper(object):
