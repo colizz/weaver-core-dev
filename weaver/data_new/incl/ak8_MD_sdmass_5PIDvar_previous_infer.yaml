@@ -197,54 +197,54 @@ observers:
     - label_Top
     - label_Wqq_jets
 
-weights:
-    ### [option 1] use precomputed weights stored in the input files
-    # use_precomputed_weights: true
-    # weight_branches: [weight, class_weight]
-    ### [option 2] compute weights on-the-fly using reweighting histograms
-    use_precomputed_weights: false
-    reweight_method: flat
-    reweight_vars:
-        fj_pt: [200, 251, 316, 398, 501, 630, 793, 997, 1255, 1579, 1987, 2500]
-        fj_sdmass:
-            [
-                20,
-                30,
-                40,
-                50,
-                60,
-                70,
-                80,
-                90,
-                100,
-                110,
-                120,
-                130,
-                140,
-                150,
-                160,
-                170,
-                180,
-                190,
-                200,
-                210,
-                220,
-                230,
-                240,
-                250,
-                260,
-            ]
-    reweight_classes: [
-            label_H_WqqWqq,
-            label_H_WqqWq,
-            label_H_WqqWev,
-            label_H_WqqWmv,
-            label_H_WqqWtauev,
-            label_H_WqqWtaumv,
-            label_H_WqqWtauhv,
-            label_QCD,
-            #label_Wqq_jets,
-            #label_Top,
-        ]
-    class_weights: [0.32, 0.08, 0.2, 0.2, 0.03, 0.03, 0.14, 1] #, 0.5, 0.15]
-    reweight_hists:
+# weights:
+#     ### [option 1] use precomputed weights stored in the input files
+#     # use_precomputed_weights: true
+#     # weight_branches: [weight, class_weight]
+#     ### [option 2] compute weights on-the-fly using reweighting histograms
+#     use_precomputed_weights: false
+#     reweight_method: flat
+#     reweight_vars:
+#         fj_pt: [200, 251, 316, 398, 501, 630, 793, 997, 1255, 1579, 1987, 2500]
+#         fj_sdmass:
+#             [
+#                 20,
+#                 30,
+#                 40,
+#                 50,
+#                 60,
+#                 70,
+#                 80,
+#                 90,
+#                 100,
+#                 110,
+#                 120,
+#                 130,
+#                 140,
+#                 150,
+#                 160,
+#                 170,
+#                 180,
+#                 190,
+#                 200,
+#                 210,
+#                 220,
+#                 230,
+#                 240,
+#                 250,
+#                 260,
+#             ]
+#     reweight_classes: [
+#             label_H_WqqWqq,
+#             label_H_WqqWq,
+#             label_H_WqqWev,
+#             label_H_WqqWmv,
+#             label_H_WqqWtauev,
+#             label_H_WqqWtaumv,
+#             label_H_WqqWtauhv,
+#             label_QCD,
+#             #label_Wqq_jets,
+#             #label_Top,
+#         ]
+#     class_weights: [0.32, 0.08, 0.2, 0.2, 0.03, 0.03, 0.14, 1] #, 0.5, 0.15]
+#     reweight_hists:
