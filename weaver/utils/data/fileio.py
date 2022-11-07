@@ -41,6 +41,8 @@ def construct_jagged(target, length, builder):
     return builder
 
 def _read_root(filepath, branches, load_range=None, treename=None):
+    # for training with v4 and v5
+    '''
     specific_vars = {
         # keywords: variable list
         "'BulkGravitonToHHTo4QTau' not in filepath and 'Spin0ToTT_VariableMass_W' not in filepath": {
@@ -104,6 +106,14 @@ def _read_root(filepath, branches, load_range=None, treename=None):
         },
         "'QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8' not in filepath": {
             'sample_isQCD_real': 0.,
+        },
+    }
+    '''
+    # for training with v6
+    specific_vars = {
+        # keywords: variable list
+        "'ChargedHiggs_HplusToBC_HminusToBC' not in filepath": {
+            'label_H_bc': 0.,
         },
     }
     specific_vars_included = {

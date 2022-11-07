@@ -1,0 +1,195 @@
+treename: null
+selection: "(jet_tightId==1) & (jet_no<2) & (fj_pt>200) & (fj_pt<2500) & (\n  (\n\
+  \    (label_Top_bc>0)|(label_Top_bcq>0)|(label_Top_bev>0)|(label_Top_bhadtauv>0)|(label_Top_bleptauev>0)|(label_Top_bleptaumv>0)|(label_Top_bmv>0)|(label_Top_bq>0)|(label_Top_bqq>0)\n\
+  \  ) |\n  (\n    ((label_QCD_b>0)|(label_QCD_bb>0)|(label_QCD_c>0)|(label_QCD_cc>0)|(label_QCD_others>0))\
+  \ & (sample_isQCD==1) & (fj_isQCD==1)\n  )\n) & (event_no%7!=0)"
+test_time_selection: (jet_tightId==1) & (jet_no<2) & (fj_pt>200) & (fj_pt<2500) &
+  ( ( (label_Top_bc>0)|(label_Top_bcq>0)|(label_Top_bev>0)|(label_Top_bhadtauv>0)|(label_Top_bleptauev>0)|(label_Top_bleptaumv>0)|(label_Top_bmv>0)|(label_Top_bq>0)|(label_Top_bqq>0)
+  ) | ( ((label_QCD_b>0)|(label_QCD_bb>0)|(label_QCD_c>0)|(label_QCD_cc>0)|(label_QCD_others>0))
+  & (sample_isQCD==1) & (fj_isQCD==1) ) ) & (event_no%7==0)
+preprocess:
+  method: manual
+  data_fraction: null
+  params: null
+new_variables:
+  input_fj_pt_log: ak.singletons(np.log(fj_pt))
+  input_fj_sdmass_log: ak.singletons(np.log(fj_sdmass))
+  input_probHWqqWqq0c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWqq0c)
+  input_probHWqqWqq1c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWqq1c)
+  input_probHWqqWqq2c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWqq2c)
+  input_probHWqqWq0c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWq0c)
+  input_probHWqqWq1c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWq1c)
+  input_probHWqqWq2c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWq2c)
+  input_probHWqqWev0c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWev0c)
+  input_probHWqqWev1c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWev1c)
+  input_probHWqqWmv0c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWmv0c)
+  input_probHWqqWmv1c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWmv1c)
+  input_probHWqqWtauev0c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtauev0c)
+  input_probHWqqWtauev1c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtauev1c)
+  input_probHWqqWtaumv0c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtaumv0c)
+  input_probHWqqWtaumv1c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtaumv1c)
+  input_probHWqqWtauhv0c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtauhv0c)
+  input_probHWqqWtauhv1c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtauhv1c)
+  input_probHbb: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHbb)
+  input_probHcc: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHcc)
+  input_probHss: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHss)
+  input_probHqq: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHqq)
+  input_probHtauhtaue: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHtauhtaue)
+  input_probHtauhtaum: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHtauhtaum)
+  input_probHtauhtauh: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probHtauhtauh)
+  input_probQCDbb: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probQCDbb)
+  input_probQCDcc: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probQCDcc)
+  input_probQCDb: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probQCDb)
+  input_probQCDc: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probQCDc)
+  input_probQCDothers: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probQCDothers)
+  input_probTopbWqq0c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWqq0c)
+  input_probTopbWqq1c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWqq1c)
+  input_probTopbWq0c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWq0c)
+  input_probTopbWq1c: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWq1c)
+  input_probTopbWev: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWev)
+  input_probTopbWmv: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWmv)
+  input_probTopbWtauhv: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWtauhv)
+  input_probTopbWtauev: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWtauev)
+  input_probTopbWtaumv: ak.singletons(pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWtaumv)
+  _label_: np.argmax(np.stack([label_Top_bcq,label_Top_bqq,label_Top_bc,label_Top_bq,label_Top_bev,label_Top_bmv,label_Top_bleptauev,label_Top_bleptaumv,label_Top_bhadtauv,label_QCD_bb,label_QCD_cc,label_QCD_b,label_QCD_c,label_QCD_others],
+    axis=1), axis=1)
+  _labelcheck_: np.sum(np.stack([label_Top_bcq,label_Top_bqq,label_Top_bc,label_Top_bq,label_Top_bev,label_Top_bmv,label_Top_bleptauev,label_Top_bleptaumv,label_Top_bhadtauv,label_QCD_bb,label_QCD_cc,label_QCD_b,label_QCD_c,label_QCD_others],
+    axis=1), axis=1)
+inputs:
+  highlevel:
+    length: 1
+    vars:
+    - - input_fj_pt_log
+      - 7.0
+      - 2.0
+    - - input_fj_sdmass_log
+      - 4.0
+      - 0.5
+    - input_probHWqqWqq0c
+    - input_probHWqqWqq1c
+    - input_probHWqqWqq2c
+    - input_probHWqqWq0c
+    - input_probHWqqWq1c
+    - input_probHWqqWq2c
+    - input_probHWqqWev0c
+    - input_probHWqqWev1c
+    - input_probHWqqWmv0c
+    - input_probHWqqWmv1c
+    - input_probHWqqWtauev0c
+    - input_probHWqqWtauev1c
+    - input_probHWqqWtaumv0c
+    - input_probHWqqWtaumv1c
+    - input_probHWqqWtauhv0c
+    - input_probHWqqWtauhv1c
+    - input_probHbb
+    - input_probHcc
+    - input_probHss
+    - input_probHqq
+    - input_probHtauhtaue
+    - input_probHtauhtaum
+    - input_probHtauhtauh
+    - input_probQCDbb
+    - input_probQCDcc
+    - input_probQCDb
+    - input_probQCDc
+    - input_probQCDothers
+    - input_probTopbWqq0c
+    - input_probTopbWqq1c
+    - input_probTopbWq0c
+    - input_probTopbWq1c
+    - input_probTopbWev
+    - input_probTopbWmv
+    - input_probTopbWtauhv
+    - input_probTopbWtauev
+    - input_probTopbWtaumv
+labels:
+  type: simple
+  value:
+  - label_Top_bcq
+  - label_Top_bqq
+  - label_Top_bc
+  - label_Top_bq
+  - label_Top_bev
+  - label_Top_bmv
+  - label_Top_bleptauev
+  - label_Top_bleptaumv
+  - label_Top_bhadtauv
+  - label_QCD_bb
+  - label_QCD_cc
+  - label_QCD_b
+  - label_QCD_c
+  - label_QCD_others
+observers:
+- event_no
+- fj_label
+- fj_pt
+- fj_eta
+- fj_phi
+- fj_sdmass
+- fj_sdmass_fromsubjets
+- npfcands
+- pfDeepBoostedDiscriminatorsJetTags_TvsQCD
+- pfDeepBoostedDiscriminatorsJetTags_WvsQCD
+- pfDeepBoostedDiscriminatorsJetTags_HbbvsQCD
+- pfMassDecorrelatedDeepBoostedDiscriminatorsJetTags_TvsQCD
+- pfMassDecorrelatedDeepBoostedDiscriminatorsJetTags_WvsQCD
+- pfMassDecorrelatedDeepBoostedDiscriminatorsJetTags_ZHbbvsQCD
+- pfParticleNetDiscriminatorsJetTags_TvsQCD
+- pfParticleNetDiscriminatorsJetTags_WvsQCD
+- pfParticleNetDiscriminatorsJetTags_HbbvsQCD
+- pfMassDecorrelatedParticleNetDiscriminatorsJetTags_XbbvsQCD
+- pfMassDecorrelatedParticleNetJetTags_probXbb
+- pfMassDecorrelatedParticleNetJetTags_probXcc
+- pfMassDecorrelatedParticleNetJetTags_probXqq
+monitor_variables: []
+weights:
+  use_precomputed_weights: false
+  reweight_method: flat
+  reweight_vars:
+    fj_pt:
+    - 200
+    - 251
+    - 316
+    - 398
+    - 501
+    - 630
+    - 793
+    - 997
+    - 1255
+    - 1579
+    - 1987
+    - 2500
+    fj_sdmass:
+    - -10000
+    - 10000
+  reweight_classes:
+  - fj_isQCD
+  - fj_isTop
+  class_weights:
+  - 1
+  - 1
+  reweight_hists:
+    fj_isQCD:
+    - - 0.014325322583317757
+    - - 0.014325322583317757
+    - - 0.014066406525671482
+    - - 0.010474483482539654
+    - - 0.008373807184398174
+    - - 0.008262261748313904
+    - - 0.00747039495036006
+    - - 0.010498888790607452
+    - - 0.009139113128185272
+    - - 0.009274165146052837
+    - - 0.01203235611319542
+    fj_isTop:
+    - - 0.8999999761581421
+    - - 0.46759212017059326
+    - - 0.2522810995578766
+    - - 0.1559223234653473
+    - - 0.12361572682857513
+    - - 0.1229427233338356
+    - - 0.15057621896266937
+    - - 0.17193494737148285
+    - - 0.2032506912946701
+    - - 0.31557396054267883
+    - - 0.8999999761581421
