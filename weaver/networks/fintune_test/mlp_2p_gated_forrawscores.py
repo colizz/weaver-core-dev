@@ -40,9 +40,7 @@ class MultiLayerPerceptron2Path(nn.Module):
             )
 
     def forward(self, xp, x):
-        # x: the feature vector initally read from the data structure, in dimension (N, C, P) (P=1 for high-level vars)
-        xp = xp.squeeze(2) # (N, C)
-        x = x.squeeze(2) # (N, C)
+        # x: the feature vector initally read from the data structure, in dimension (N, C) (no last dimension P as we set length = None)
         x = torch.log(x.clamp(min=1e-10)) ## resume the pre-softmax score
         if self.neurons_in_preprocess:
             xp = torch.cat((xp, x), dim=1)

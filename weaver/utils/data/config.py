@@ -67,7 +67,10 @@ class DataConfig(object):
         self.input_dicts = {k: [] for k in self.input_names}
         self.input_shapes = {}
         for k, o in opts['inputs'].items():
-            self.input_shapes[k] = (-1, len(o['vars']), o['length'])
+            if o['length'] is not None:
+                self.input_shapes[k] = (-1, len(o['vars']), o['length'])
+            else:
+                self.input_shapes[k] = (-1, len(o['vars']))
             for v in o['vars']:
                 v = _as_list(v)
                 self.input_dicts[k].append(v[0])

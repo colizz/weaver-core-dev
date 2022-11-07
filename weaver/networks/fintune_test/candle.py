@@ -26,8 +26,7 @@ class MultiLayerPerceptron(nn.Module):
         self.mlp = nn.Sequential(*layers)
 
     def forward(self, x):
-        # x: the feature vector initally read from the data structure, in dimension (N, C, P) (P=1 for high-level vars)
-        x = x.squeeze(2) # (N, C)
+        # x: the feature vector initally read from the data structure, in dimension (N, C) (no last dimension P as we set length = None)
         y = self.mlp(x)
         x = x[:, 2:]
         x = torch.log(x)
