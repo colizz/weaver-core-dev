@@ -867,6 +867,8 @@ def main():
         args._auto_model_name = model_name
         args.model_prefix = args.model_prefix.replace('{auto}', model_name)
         args.log = args.log.replace('{auto}', model_name)
+        if args.tensorboard is not None:
+            args.tensorboard = args.tensorboard.replace('{auto}', model_name)
         print('Using auto-generated model prefix %s' % args.model_prefix)
 
     if args.predict_gpus is None:

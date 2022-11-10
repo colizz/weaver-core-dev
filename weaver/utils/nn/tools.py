@@ -92,6 +92,7 @@ def train_classification(model, loss_func, opt, scheduler, train_loader, dev, ep
 
             if tb_helper:
                 tb_helper.write_scalars([
+                    # ("lr/train", scheduler.get_last_lr()[0] if scheduler else opt.defaults['lr'], tb_helper.batch_train_count + num_batches),
                     ("Loss/train", loss, tb_helper.batch_train_count + num_batches),
                     ("Acc/train", correct / num_examples, tb_helper.batch_train_count + num_batches),
                     ])
