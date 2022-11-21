@@ -30,7 +30,7 @@ def get_model(data_config, jittable=False, **kwargs):
                        use_counts=kwargs.get('use_counts', True),
                        pf_input_dropout=kwargs.get('pf_input_dropout', 0.0),
                        sv_input_dropout=kwargs.get('sv_input_dropout', 0.0),
-                       for_inference=False,
+                       for_inference=kwargs.get('for_inference', False),
                        )
 
     model_info = {
