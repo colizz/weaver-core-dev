@@ -245,10 +245,12 @@ class ParticleNet(nn.Module):
 
         output = self.fc(x)
         if self.for_inference:
-            output_cls, output_reg = output.split([output.size(1) - 1, 1], dim=1)
-            output_cls = torch.softmax(output_cls, dim=1)
+            output = torch.softmax(output, dim=1)
 
-            output = torch.cat([output_cls, output_reg], dim=-1)
+            #output_cls, output_reg = output.split([output.size(1) - 1, 1], dim=1)
+            #output_cls = torch.softmax(output_cls, dim=1)
+
+            #output = torch.cat([output_cls, output_reg], dim=-1)
         # print('output:\n', output)
         return output
 

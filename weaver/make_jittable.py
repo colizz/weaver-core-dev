@@ -6,6 +6,20 @@ from utils.dataset import SimpleIterDataset
 
 from importlib import import_module
 
+import numpy as np
+
+batch_size = 10
+pfs = 100
+svs = 10
+
+input_dict = {
+    "pf_points__0": np.random.rand(batch_size, 2, pfs).astype("float32"),
+    "pf_features__1": np.random.rand(batch_size, 25, pfs).astype("float32"),
+    "pf_mask__2": (np.random.rand(batch_size, 1, pfs) > 0.2).astype("float32"),
+    "sv_points__3": np.random.rand(batch_size, 2, svs).astype("float32"),
+    "sv_features__4": np.random.rand(batch_size, 11, svs).astype("float32"),
+    "sv_mask__5": (np.random.rand(batch_size, 1, svs) > 0.2).astype("float32"),
+}
 
 def main(args):
     data_config = SimpleIterDataset([], args.data_config, for_training=False).config
@@ -18,11 +32,35 @@ def main(args):
         strict=False,
     )
     _ = model.eval()
-    print(model)
+
+    model_output = model(
+        torch.tensor(input_dict["pf_points__0"]),
+        torch.tensor(input_dict["pf_features__1"]),
+        torch.tensor(input_dict["pf_mask__2"]),
+        torch.tensor(input_dict["sv_points__3"]),
+        torch.tensor(input_dict["sv_features__4"]),
+        torch.tensor(input_dict["sv_mask__5"]),
+    )
+
     jit_model = torch.jit.script(model)
-    jit_model.save(f"{args.model_prefix}_jitted.pt")
 
+    jitted_model_output = jit_model(
+        torch.tensor(input_dict["pf_points__0"]),
+        torch.tensor(input_dict["pf_features__1"]),
+        torch.tensor(input_dict["pf_mask__2"]),
+        torch.tensor(input_dict["sv_points__3"]),
+        torch.tensor(input_dict["sv_features__4"]),
+        torch.tensor(input_dict["sv_mask__5"]),
+    )
 
+    if (model_output != jitted_model_output).sum() == 0:
+        print(f"Saved in {args.model_prefix}_jitted.pt")
+        #jit_model.save(f"{args.model_prefix}_jitted.pt")
+        torch.jit.save(jit_model, f"{args.model_prefix}_jitted.pt")
+    else:
+        print("OOPS: jitted and unjitted model output DON'T match")
+        sys.exit(0
+)
 if __name__ == "__main__":
     # e.g.
     # inside a condor job: python run.py --year 2017 --processor trigger --condor --starti 0 --endi 1
