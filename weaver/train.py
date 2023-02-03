@@ -546,10 +546,16 @@ def model_setup(args, data_config):
         network_options['use_amp'] = True
     model, model_info = network_module.get_model(data_config, **network_options)
     if args.load_model_weights:
-        model_state = torch.load(args.load_model_weights, map_location='cpu')
-        missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
-        _logger.info('Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s' %
-                     (args.load_model_weights, missing_keys, unexpected_keys))
+        if args.load_model_weights == 'finetune_gghww_custom':
+            model_state = torch.load("/home/olympus/licq/hww/incl-train/weaver-core/weaver/model/ak8_MD_vminclv2ParT_manual_fixwrap/net_best_epoch_state.pt", map_location='cpu')
+            state_dict = model.state_dict()
+            state_dict['mlp.0.weight'].copy_(model_state['part.fc.0.weight'][-1:].data)
+            state_dict['mlp.0.bias'].copy_(model_state['part.fc.0.bias'][-1:].data)
+        else:
+            model_state = torch.load(args.load_model_weights, map_location='cpu')
+            missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
+            _logger.info('Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s' %
+                        (args.load_model_weights, missing_keys, unexpected_keys))
     # _logger.info(model)
     flops(model, model_info)
     # loss function

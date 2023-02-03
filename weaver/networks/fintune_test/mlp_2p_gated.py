@@ -1,12 +1,15 @@
 import torch
 import torch.nn as nn
 
-def layer(in_dim, out_dim):
-    return nn.Sequential(
-        nn.Linear(in_dim, out_dim),
-        # nn.BatchNorm1d(out_dim),
-        nn.ReLU(),
-    )
+def layer(in_dim, out_dim, no_relu=False):
+    if no_relu:
+        return nn.Linear(in_dim, out_dim)
+    else:
+        return nn.Sequential(
+            nn.Linear(in_dim, out_dim),
+            # nn.BatchNorm1d(out_dim),
+            nn.ReLU(),
+        )
 
 class MultiLayerPerceptron2Path(nn.Module):
     r"""Parameters
@@ -24,17 +27,18 @@ class MultiLayerPerceptron2Path(nn.Module):
                  **kwargs):
 
         self.neurons_in_preprocess = kwargs.pop('neurons_in_preprocess', False)
+        self.no_last_relu = kwargs.pop('no_last_relu', False)
         super(MultiLayerPerceptron2Path, self).__init__(**kwargs)
 
         if self.neurons_in_preprocess:
             preinput_dims += input_dims
         prechannels = [preinput_dims] + list(prelayer_params) + [num_classes]
         self.premlp = nn.Sequential(
-            *[layer(in_dim, out_dim) for in_dim, out_dim in zip(prechannels[:-1], prechannels[1:])]
+            *[layer(in_dim, out_dim, no_relu=(self.no_last_relu and i==len(prechannels)-2)) for i, (in_dim, out_dim) in enumerate(zip(prechannels[:-1], prechannels[1:]))]
         )
         channels = [input_dims] + list(layer_params) + [num_classes]
         self.mlp = nn.Sequential(
-            *[layer(in_dim, out_dim) for in_dim, out_dim in zip(channels[:-1], channels[1:])]
+            *[layer(in_dim, out_dim, no_relu=(self.no_last_relu and i==len(channels)-2)) for i, (in_dim, out_dim) in enumerate(zip(channels[:-1], channels[1:]))]
         )
 
     def forward(self, xp, x):

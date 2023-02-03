@@ -115,6 +115,12 @@ def _read_root(filepath, branches, load_range=None, treename=None):
         "'ChargedHiggs_HplusToBC_HminusToBC' not in filepath": {
             'label_H_bc': 0.,
         },
+        "'QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8' in filepath": {
+            'sample_isQCD_real': 1.,
+        },
+        "'QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8' not in filepath": {
+            'sample_isQCD_real': 0.,
+        },
     }
     specific_vars_included = {
         # "('TTTo' in filepath) or ('WJetsTo' in filepath)": ['fj_msoftdrop'],
