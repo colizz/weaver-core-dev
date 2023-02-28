@@ -1,3 +1,7 @@
+# NOTE
+This repo is not an organized framework but just a backup of a local directory
+starting from the https://github.com/hqucms/weaver-core
+
 # Weaver
 
 `Weaver` aims at providing a streamlined yet flexible machine learning R&D framework for high energy physics (HEP) applications. It puts particular emphases on:
