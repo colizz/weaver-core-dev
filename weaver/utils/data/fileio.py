@@ -41,8 +41,8 @@ def construct_jagged(target, length, builder):
     return builder
 
 def _read_root(filepath, branches, load_range=None, treename=None):
+    # '''
     # for training with v4 and v5
-    '''
     specific_vars = {
         # keywords: variable list
         "'BulkGravitonToHHTo4QTau' not in filepath and 'Spin0ToTT_VariableMass_W' not in filepath": {
@@ -101,6 +101,74 @@ def _read_root(filepath, branches, load_range=None, treename=None):
             'label_W_qq_b': 0.,
             'label_W_qq_c': 0.,
         },
+        # "'BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh' in filepath": {
+        #     'label_H_wxwx4q_0c': 'label_H_ww4q_0c',
+        #     'label_H_wxwx4q_1c': 'label_H_ww4q_1c',
+        #     'label_H_wxwx4q_2c': 'label_H_ww4q_2c',
+        #     'label_H_wxwx3q_0c': 'label_H_ww3q_0c',
+        #     'label_H_wxwx3q_1c': 'label_H_ww3q_1c',
+        #     'label_H_wxwx3q_2c': 'label_H_ww3q_2c',
+        #     'label_H_wxwxevqq_0c': 'label_H_wwevqq_0c',
+        #     'label_H_wxwxevqq_1c': 'label_H_wwevqq_1c',
+        #     'label_H_wxwxmvqq_0c': 'label_H_wwmvqq_0c',
+        #     'label_H_wxwxmvqq_1c': 'label_H_wwmvqq_1c',
+        #     'label_H_wxwxleptauevqq_0c': 'label_H_wwleptauevqq_0c',
+        #     'label_H_wxwxleptauevqq_1c': 'label_H_wwleptauevqq_1c',
+        #     'label_H_wxwxleptaumvqq_0c': 'label_H_wwleptaumvqq_0c',
+        #     'label_H_wxwxleptaumvqq_1c': 'label_H_wwleptaumvqq_1c',
+        #     'label_H_wxwxhadtauvqq_0c': 'label_H_wwhadtauvqq_0c',
+        #     'label_H_wxwxhadtauvqq_1c': 'label_H_wwhadtauvqq_1c',
+        #     'label_H_w0w04q_0c': 0.,
+        #     'label_H_w0w04q_1c': 0.,
+        #     'label_H_w0w04q_2c': 0.,
+        #     'label_H_w0w03q_0c': 0.,
+        #     'label_H_w0w03q_1c': 0.,
+        #     'label_H_w0w03q_2c': 0.,
+        #     'label_H_w0w0evqq_0c': 0.,
+        #     'label_H_w0w0evqq_1c': 0.,
+        #     'label_H_w0w0mvqq_0c': 0.,
+        #     'label_H_w0w0mvqq_1c': 0.,
+        #     'label_H_w0w0leptauevqq_0c': 0.,
+        #     'label_H_w0w0leptauevqq_1c': 0.,
+        #     'label_H_w0w0leptaumvqq_0c': 0.,
+        #     'label_H_w0w0leptaumvqq_1c': 0.,
+        #     'label_H_w0w0hadtauvqq_0c': 0.,
+        #     'label_H_w0w0hadtauvqq_1c': 0.,
+        # },
+        # "'BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh' not in filepath": {
+        #     'label_H_wxwx4q_0c': 0.,
+        #     'label_H_wxwx4q_1c': 0.,
+        #     'label_H_wxwx4q_2c': 0.,
+        #     'label_H_wxwx3q_0c': 0.,
+        #     'label_H_wxwx3q_1c': 0.,
+        #     'label_H_wxwx3q_2c': 0.,
+        #     'label_H_wxwxevqq_0c': 0.,
+        #     'label_H_wxwxevqq_1c': 0.,
+        #     'label_H_wxwxmvqq_0c': 0.,
+        #     'label_H_wxwxmvqq_1c': 0.,
+        #     'label_H_wxwxleptauevqq_0c': 0.,
+        #     'label_H_wxwxleptauevqq_1c': 0.,
+        #     'label_H_wxwxleptaumvqq_0c': 0.,
+        #     'label_H_wxwxleptaumvqq_1c': 0.,
+        #     'label_H_wxwxhadtauvqq_0c': 0.,
+        #     'label_H_wxwxhadtauvqq_1c': 0.,
+        #     'label_H_w0w04q_0c': 'label_H_ww4q_0c',
+        #     'label_H_w0w04q_1c': 'label_H_ww4q_1c',
+        #     'label_H_w0w04q_2c': 'label_H_ww4q_2c',
+        #     'label_H_w0w03q_0c': 'label_H_ww3q_0c',
+        #     'label_H_w0w03q_1c': 'label_H_ww3q_1c',
+        #     'label_H_w0w03q_2c': 'label_H_ww3q_2c',
+        #     'label_H_w0w0evqq_0c': 'label_H_wwevqq_0c',
+        #     'label_H_w0w0evqq_1c': 'label_H_wwevqq_1c',
+        #     'label_H_w0w0mvqq_0c': 'label_H_wwmvqq_0c',
+        #     'label_H_w0w0mvqq_1c': 'label_H_wwmvqq_1c',
+        #     'label_H_w0w0leptauevqq_0c': 'label_H_wwleptauevqq_0c',
+        #     'label_H_w0w0leptauevqq_1c': 'label_H_wwleptauevqq_1c',
+        #     'label_H_w0w0leptaumvqq_0c': 'label_H_wwleptaumvqq_0c',
+        #     'label_H_w0w0leptaumvqq_1c': 'label_H_wwleptaumvqq_1c',
+        #     'label_H_w0w0hadtauvqq_0c': 'label_H_wwhadtauvqq_0c',
+        #     'label_H_w0w0hadtauvqq_1c': 'label_H_wwhadtauvqq_1c',
+        # },
         "'QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8' in filepath": {
             'sample_isQCD_real': 1.,
         },
@@ -108,6 +176,10 @@ def _read_root(filepath, branches, load_range=None, treename=None):
             'sample_isQCD_real': 0.,
         },
     }
+    specific_vars_included = {
+        "True": ['label_H_ww4q_0c', 'label_H_ww4q_1c', 'label_H_ww4q_2c', 'label_H_ww3q_0c', 'label_H_ww3q_1c', 'label_H_ww3q_2c', 'label_H_wwevqq_0c', 'label_H_wwevqq_1c', 'label_H_wwmvqq_0c', 'label_H_wwmvqq_1c', 'label_H_wwleptauevqq_0c', 'label_H_wwleptauevqq_1c', 'label_H_wwleptaumvqq_0c', 'label_H_wwleptaumvqq_1c', 'label_H_wwhadtauvqq_0c', 'label_H_wwhadtauvqq_1c'],
+    }
+    # '''
     '''
     # for training with v6
     specific_vars = {
@@ -121,10 +193,34 @@ def _read_root(filepath, branches, load_range=None, treename=None):
         "'QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8' not in filepath": {
             'sample_isQCD_real': 0.,
         },
+        ### seprarate HWW and XWW
+        # "'BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh' in filepath": {
+        #     'label_H_wxwx4q_0c': 'label_H_ww4q_0c', 'label_H_wxwx4q_1c': 'label_H_ww4q_1c', 'label_H_wxwx4q_2c': 'label_H_ww4q_2c','label_H_wxwx3q_0c': 'label_H_ww3q_0c', 'label_H_wxwx3q_1c': 'label_H_ww3q_1c', 'label_H_wxwx3q_2c': 'label_H_ww3q_2c', 'label_H_wxwxevqq_0c': 'label_H_wwevqq_0c', 'label_H_wxwxevqq_1c': 'label_H_wwevqq_1c', 'label_H_wxwxmvqq_0c': 'label_H_wwmvqq_0c', 'label_H_wxwxmvqq_1c': 'label_H_wwmvqq_1c', 'label_H_wxwxleptauevqq_0c': 'label_H_wwleptauevqq_0c', 'label_H_wxwxleptauevqq_1c': 'label_H_wwleptauevqq_1c', 'label_H_wxwxleptaumvqq_0c': 'label_H_wwleptaumvqq_0c', 'label_H_wxwxleptaumvqq_1c': 'label_H_wwleptaumvqq_1c', 'label_H_wxwxhadtauvqq_0c': 'label_H_wwhadtauvqq_0c', 'label_H_wxwxhadtauvqq_1c': 'label_H_wwhadtauvqq_1c', 
+        #     'label_H_w0w04q_0c': 0., 'label_H_w0w04q_1c': 0., 'label_H_w0w04q_2c': 0., 'label_H_w0w03q_0c': 0., 'label_H_w0w03q_1c': 0., 'label_H_w0w03q_2c': 0., 'label_H_w0w0evqq_0c': 0., 'label_H_w0w0evqq_1c': 0., 'label_H_w0w0mvqq_0c': 0., 'label_H_w0w0mvqq_1c': 0., 'label_H_w0w0leptauevqq_0c': 0., 'label_H_w0w0leptauevqq_1c': 0., 'label_H_w0w0leptaumvqq_0c': 0., 'label_H_w0w0leptaumvqq_1c': 0., 'label_H_w0w0hadtauvqq_0c': 0., 'label_H_w0w0hadtauvqq_1c': 0.,
+        # },
+        # "'BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh' not in filepath": {
+        #     'label_H_wxwx4q_0c': 0., 'label_H_wxwx4q_1c': 0., 'label_H_wxwx4q_2c': 0., 'label_H_wxwx3q_0c': 0., 'label_H_wxwx3q_1c': 0., 'label_H_wxwx3q_2c': 0., 'label_H_wxwxevqq_0c': 0., 'label_H_wxwxevqq_1c': 0., 'label_H_wxwxmvqq_0c': 0., 'label_H_wxwxmvqq_1c': 0., 'label_H_wxwxleptauevqq_0c': 0., 'label_H_wxwxleptauevqq_1c': 0., 'label_H_wxwxleptaumvqq_0c': 0., 'label_H_wxwxleptaumvqq_1c': 0., 'label_H_wxwxhadtauvqq_0c': 0., 'label_H_wxwxhadtauvqq_1c': 0.,
+        #     'label_H_w0w04q_0c': 'label_H_ww4q_0c', 'label_H_w0w04q_1c': 'label_H_ww4q_1c', 'label_H_w0w04q_2c': 'label_H_ww4q_2c', 'label_H_w0w03q_0c': 'label_H_ww3q_0c', 'label_H_w0w03q_1c': 'label_H_ww3q_1c', 'label_H_w0w03q_2c': 'label_H_ww3q_2c', 'label_H_w0w0evqq_0c': 'label_H_wwevqq_0c', 'label_H_w0w0evqq_1c': 'label_H_wwevqq_1c', 'label_H_w0w0mvqq_0c': 'label_H_wwmvqq_0c', 'label_H_w0w0mvqq_1c': 'label_H_wwmvqq_1c', 'label_H_w0w0leptauevqq_0c': 'label_H_wwleptauevqq_0c', 'label_H_w0w0leptauevqq_1c': 'label_H_wwleptauevqq_1c', 'label_H_w0w0leptaumvqq_0c': 'label_H_wwleptaumvqq_0c', 'label_H_w0w0leptaumvqq_1c': 'label_H_wwleptaumvqq_1c', 'label_H_w0w0hadtauvqq_0c': 'label_H_wwhadtauvqq_0c', 'label_H_w0w0hadtauvqq_1c': 'label_H_wwhadtauvqq_1c',
+        # },
+        ### new: separate HWW, XWW and XWW*
+        "'BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh' in filepath": {
+            'alpha_dau_bal': 'abs(fj_gendau1_mass - fj_gendau2_mass) / (fj_gendau1_mass + fj_gendau2_mass)',
+            'label_H_wxwxunbal4q_0c': '(alpha_dau_bal >= 0.1) & (label_H_ww4q_0c > 0)', 'label_H_wxwxunbal4q_1c': '(alpha_dau_bal >= 0.1) & (label_H_ww4q_1c > 0)', 'label_H_wxwxunbal4q_2c': '(alpha_dau_bal >= 0.1) & (label_H_ww4q_2c > 0)', 'label_H_wxwxunbal3q_0c': '(alpha_dau_bal >= 0.1) & (label_H_ww3q_0c > 0)', 'label_H_wxwxunbal3q_1c': '(alpha_dau_bal >= 0.1) & (label_H_ww3q_1c > 0)', 'label_H_wxwxunbal3q_2c': '(alpha_dau_bal >= 0.1) & (label_H_ww3q_2c > 0)', 'label_H_wxwxunbalevqq_0c': '(alpha_dau_bal >= 0.1) & (label_H_wwevqq_0c > 0)', 'label_H_wxwxunbalevqq_1c': '(alpha_dau_bal >= 0.1) & (label_H_wwevqq_1c > 0)', 'label_H_wxwxunbalmvqq_0c': '(alpha_dau_bal >= 0.1) & (label_H_wwmvqq_0c > 0)', 'label_H_wxwxunbalmvqq_1c': '(alpha_dau_bal >= 0.1) & (label_H_wwmvqq_1c > 0)', 'label_H_wxwxunballeptauevqq_0c': '(alpha_dau_bal >= 0.1) & (label_H_wwleptauevqq_0c > 0)', 'label_H_wxwxunballeptauevqq_1c': '(alpha_dau_bal >= 0.1) & (label_H_wwleptauevqq_1c > 0)', 'label_H_wxwxunballeptaumvqq_0c': '(alpha_dau_bal >= 0.1) & (label_H_wwleptaumvqq_0c > 0)', 'label_H_wxwxunballeptaumvqq_1c': '(alpha_dau_bal >= 0.1) & (label_H_wwleptaumvqq_1c > 0)', 'label_H_wxwxunbalhadtauvqq_0c': '(alpha_dau_bal >= 0.1) & (label_H_wwhadtauvqq_0c > 0)', 'label_H_wxwxunbalhadtauvqq_1c': '(alpha_dau_bal >= 0.1) & (label_H_wwhadtauvqq_1c > 0)', 
+            'label_H_wxwxbal4q_0c': '(alpha_dau_bal < 0.1) & (label_H_ww4q_0c > 0)', 'label_H_wxwxbal4q_1c': '(alpha_dau_bal < 0.1) & (label_H_ww4q_1c > 0)', 'label_H_wxwxbal4q_2c': '(alpha_dau_bal < 0.1) & (label_H_ww4q_2c > 0)', 'label_H_wxwxbal3q_0c': '(alpha_dau_bal < 0.1) & (label_H_ww3q_0c > 0)', 'label_H_wxwxbal3q_1c': '(alpha_dau_bal < 0.1) & (label_H_ww3q_1c > 0)', 'label_H_wxwxbal3q_2c': '(alpha_dau_bal < 0.1) & (label_H_ww3q_2c > 0)', 'label_H_wxwxbalevqq_0c': '(alpha_dau_bal < 0.1) & (label_H_wwevqq_0c > 0)', 'label_H_wxwxbalevqq_1c': '(alpha_dau_bal < 0.1) & (label_H_wwevqq_1c > 0)', 'label_H_wxwxbalmvqq_0c': '(alpha_dau_bal < 0.1) & (label_H_wwmvqq_0c > 0)', 'label_H_wxwxbalmvqq_1c': '(alpha_dau_bal < 0.1) & (label_H_wwmvqq_1c > 0)', 'label_H_wxwxballeptauevqq_0c': '(alpha_dau_bal < 0.1) & (label_H_wwleptauevqq_0c > 0)', 'label_H_wxwxballeptauevqq_1c': '(alpha_dau_bal < 0.1) & (label_H_wwleptauevqq_1c > 0)', 'label_H_wxwxballeptaumvqq_0c': '(alpha_dau_bal < 0.1) & (label_H_wwleptaumvqq_0c > 0)', 'label_H_wxwxballeptaumvqq_1c': '(alpha_dau_bal < 0.1) & (label_H_wwleptaumvqq_1c > 0)', 'label_H_wxwxbalhadtauvqq_0c': '(alpha_dau_bal < 0.1) & (label_H_wwhadtauvqq_0c > 0)', 'label_H_wxwxbalhadtauvqq_1c': '(alpha_dau_bal < 0.1) & (label_H_wwhadtauvqq_1c > 0)', 
+            'label_H_w0w04q_0c': 0., 'label_H_w0w04q_1c': 0., 'label_H_w0w04q_2c': 0., 'label_H_w0w03q_0c': 0., 'label_H_w0w03q_1c': 0., 'label_H_w0w03q_2c': 0., 'label_H_w0w0evqq_0c': 0., 'label_H_w0w0evqq_1c': 0., 'label_H_w0w0mvqq_0c': 0., 'label_H_w0w0mvqq_1c': 0., 'label_H_w0w0leptauevqq_0c': 0., 'label_H_w0w0leptauevqq_1c': 0., 'label_H_w0w0leptaumvqq_0c': 0., 'label_H_w0w0leptaumvqq_1c': 0., 'label_H_w0w0hadtauvqq_0c': 0., 'label_H_w0w0hadtauvqq_1c': 0.,
+        },
+        "'BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh' not in filepath": {
+            'alpha_dau_bal': -99.,
+            'label_H_wxwxunbal4q_0c': 0., 'label_H_wxwxunbal4q_1c': 0., 'label_H_wxwxunbal4q_2c': 0., 'label_H_wxwxunbal3q_0c': 0., 'label_H_wxwxunbal3q_1c': 0., 'label_H_wxwxunbal3q_2c': 0., 'label_H_wxwxunbalevqq_0c': 0., 'label_H_wxwxunbalevqq_1c': 0., 'label_H_wxwxunbalmvqq_0c': 0., 'label_H_wxwxunbalmvqq_1c': 0., 'label_H_wxwxunballeptauevqq_0c': 0., 'label_H_wxwxunballeptauevqq_1c': 0., 'label_H_wxwxunballeptaumvqq_0c': 0., 'label_H_wxwxunballeptaumvqq_1c': 0., 'label_H_wxwxunbalhadtauvqq_0c': 0., 'label_H_wxwxunbalhadtauvqq_1c': 0.,
+            'label_H_wxwxbal4q_0c': 0., 'label_H_wxwxbal4q_1c': 0., 'label_H_wxwxbal4q_2c': 0., 'label_H_wxwxbal3q_0c': 0., 'label_H_wxwxbal3q_1c': 0., 'label_H_wxwxbal3q_2c': 0., 'label_H_wxwxbalevqq_0c': 0., 'label_H_wxwxbalevqq_1c': 0., 'label_H_wxwxbalmvqq_0c': 0., 'label_H_wxwxbalmvqq_1c': 0., 'label_H_wxwxballeptauevqq_0c': 0., 'label_H_wxwxballeptauevqq_1c': 0., 'label_H_wxwxballeptaumvqq_0c': 0., 'label_H_wxwxballeptaumvqq_1c': 0., 'label_H_wxwxbalhadtauvqq_0c': 0., 'label_H_wxwxbalhadtauvqq_1c': 0.,
+            'label_H_w0w04q_0c': 'label_H_ww4q_0c', 'label_H_w0w04q_1c': 'label_H_ww4q_1c', 'label_H_w0w04q_2c': 'label_H_ww4q_2c', 'label_H_w0w03q_0c': 'label_H_ww3q_0c', 'label_H_w0w03q_1c': 'label_H_ww3q_1c', 'label_H_w0w03q_2c': 'label_H_ww3q_2c', 'label_H_w0w0evqq_0c': 'label_H_wwevqq_0c', 'label_H_w0w0evqq_1c': 'label_H_wwevqq_1c', 'label_H_w0w0mvqq_0c': 'label_H_wwmvqq_0c', 'label_H_w0w0mvqq_1c': 'label_H_wwmvqq_1c', 'label_H_w0w0leptauevqq_0c': 'label_H_wwleptauevqq_0c', 'label_H_w0w0leptauevqq_1c': 'label_H_wwleptauevqq_1c', 'label_H_w0w0leptaumvqq_0c': 'label_H_wwleptaumvqq_0c', 'label_H_w0w0leptaumvqq_1c': 'label_H_wwleptaumvqq_1c', 'label_H_w0w0hadtauvqq_0c': 'label_H_wwhadtauvqq_0c', 'label_H_w0w0hadtauvqq_1c': 'label_H_wwhadtauvqq_1c',
+        },
     }
     specific_vars_included = {
-        # "('TTTo' in filepath) or ('WJetsTo' in filepath)": ['fj_msoftdrop'],
+        # "True": ['label_H_ww4q_0c', 'label_H_ww4q_1c', 'label_H_ww4q_2c', 'label_H_ww3q_0c', 'label_H_ww3q_1c', 'label_H_ww3q_2c', 'label_H_wwevqq_0c', 'label_H_wwevqq_1c', 'label_H_wwmvqq_0c', 'label_H_wwmvqq_1c', 'label_H_wwleptauevqq_0c', 'label_H_wwleptauevqq_1c', 'label_H_wwleptaumvqq_0c', 'label_H_wwleptaumvqq_1c', 'label_H_wwhadtauvqq_0c', 'label_H_wwhadtauvqq_1c'],
+        "True": ['label_H_ww4q_0c', 'label_H_ww4q_1c', 'label_H_ww4q_2c', 'label_H_ww3q_0c', 'label_H_ww3q_1c', 'label_H_ww3q_2c', 'label_H_wwevqq_0c', 'label_H_wwevqq_1c', 'label_H_wwmvqq_0c', 'label_H_wwmvqq_1c', 'label_H_wwleptauevqq_0c', 'label_H_wwleptauevqq_1c', 'label_H_wwleptaumvqq_0c', 'label_H_wwleptaumvqq_1c', 'label_H_wwhadtauvqq_0c', 'label_H_wwhadtauvqq_1c', 'fj_gendau1_mass', 'fj_gendau2_mass'],
     }
+    '''
     def remove_branch(branches, filepath):
         for expr, new_branch_dict in specific_vars.items():
             if eval(expr):
@@ -141,7 +237,7 @@ def _read_root(filepath, branches, load_range=None, treename=None):
                     if isinstance(v, (int, float)):
                         outputs[b] = np.zeros(nent, dtype=np.float32) + v
                     elif isinstance(v, str):
-                        outputs[b] = eval(v)
+                        outputs[b] = ak.values_astype(ak.numexpr.evaluate(v, outputs), np.float32)
 
     _branches = branches.copy()
     _branches = remove_branch(_branches, filepath)
@@ -166,7 +262,6 @@ def _read_root(filepath, branches, load_range=None, treename=None):
 
     nent = len(outputs)
     add_new_branch(outputs, filepath, nent)
-    # import awkward as ak; print('////', filepath, ak.fields(outputs))
     # print('//', filepath, ak.fields(outputs))
 
     return outputs

@@ -851,7 +851,59 @@ python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode regression 
 'ofcttbarsemilep:'$DATAPATH'/20221023_ak8_UL17_v6/TTToSemiLeptonic_TuneCP5_13TeV-powheg-pythia8/01/*.root' \
 'ofcttbarfulllep:'$DATAPATH'/20221023_ak8_UL17_v6/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/01/*.root' \
 --data-config ${config} \
-
 --network-config $HOME/hww/incl-train/weaver-core/weaver/networks/$network_name.py \
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
 --predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+# infer the Z'->ttbar sample (but it's for other studies. the MET all assigned zero...)
+NGPUS=1
+GPU=0
+DATAPATH=/mldata/licq/deepjetak8
+PREFIX=ak8_hidneurons_gghww_addFullInvMass.lr2e-2;  network_name=fintune_test/mlp_2p_gated_regression; ext_opt="-o neurons_in_preprocess True -o no_last_relu True"
+
+config=$HOME/hww/incl-train/weaver-core/weaver/data_new/finetune_gghww/${PREFIX%%.*}_inferttbarfull.yaml
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode regression --predict ${ext_opt} \
+--batch-size 512 --gpus $GPU \
+--data-test \
+'ttbarfull:'$DATAPATH'/20221023_ak8_UL17_v6/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*/*.root' \
+--data-config ${config} \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/$network_name.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+
+# re-infer Z'->ttbar sample with more events...
+GPU=0
+PREFIX=ak8_MD_vminclv2ParT_manual_fixwrap ## needs modification
+config=$HOME/hww/incl-train/weaver-core/weaver/data_new/incl/${PREFIX//./_}_inferttbarfull.yaml
+DATAPATH=/data/pubfs/licq/deepjetak8
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
+--train-mode hybrid -o loss_gamma 0.05 --batch-size 512 --num-workers 3 \
+--gpus ${GPU} --data-test \
+'ttbarfull:'$DATAPATH'/20220625_ak8_UL17_v4/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*/*.root' \
+--data-config ${config} \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformerTagger_hybrid.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/$PREFIX/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+# 23.04.15 train PNet with regression only..
+NGPUS=2
+PREFIX=ak8_MD_vminclv2_pre2_regonly_manual ## needs modification
+config=$HOME/hww/incl-train/weaver-core/weaver/data_new/incl/${PREFIX//./_}.yaml
+DATAPATH=/mldata/licq/deepjetak8
+
+CUDA_VISIBLE_DEVICES=0,1 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS $HOME/hww/incl-train/weaver-core/weaver/train.py \
+--train-mode regression \
+--batch-size 512 --start-lr 5e-3 --num-epochs 30 --optimizer ranger \
+--backend nccl --data-train \
+$DATAPATH'/20220625_ak8_UL17_v4/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/01/*.root' \
+$DATAPATH'/20220915_ak8_UL17_v5/BulkGravitonToHHTo4QTau_MX-600to6000_MH-15to250/*/*.root' \
+$DATAPATH'/20220625_ak8_UL17_v4/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass/*/*.root' \
+$DATAPATH'/20220915_ak8_UL17_v5/Spin0ToTT_VariableMass_W*_MX-600to6000_MH-15to250/*/*.root' \
+--samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
+--data-config ${config} --num-workers 5 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/particle_net_pf_sv_mass_regression.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
