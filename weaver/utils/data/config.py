@@ -99,13 +99,21 @@ class DataConfig(object):
         self.label_value_custom = opts['labels']['value_custom'] if self.label_type == 'hybrid' else opts['labels']['value']
         self.label_names = []
         if self.label_type in ['simple', 'hybrid']:
-            assert(isinstance(self.label_value, list))
             self.label_names.extend(['_label_'])
-            self.var_funcs['_label_'] = 'np.argmax(np.stack([%s], axis=1), axis=1)' % (','.join(self.label_value))
-            self.var_funcs['_labelcheck_'] = 'np.sum(np.stack([%s], axis=1), axis=1)' % (','.join(self.label_value))
+            if self.label_value is not None:
+                assert isinstance(self.label_value, list)
+                self.var_funcs['_label_'] = 'np.argmax(np.stack([%s], axis=1), axis=1)' % (','.join(self.label_value))
+                self.var_funcs['_labelcheck_'] = 'np.sum(np.stack([%s], axis=1), axis=1)' % (','.join(self.label_value))
+                self.label_value_cls_num = len(self.label_value)
+            else:
+                self.var_funcs['_label_'] = opts['labels']['value_cls_index']
+                self.var_funcs['_labelcheck_'] = 'ak.ones_like(%s)' % opts['labels']['value_cls_index']
+                self.label_value_cls_names = opts['labels']['value_cls_names']
+                self.label_value_cls_num = len(self.label_value_cls_names)
         if self.label_type in ['custom', 'hybrid']:
             self.label_names.extend(list(self.label_value_custom.keys()))
             self.var_funcs.update(self.label_value_custom)
+            self.label_value_reg_num = len(self.label_value_custom)
         self.label_names = tuple(self.label_names)
         self.basewgt_name = '_basewgt_'
         self.weight_name = None

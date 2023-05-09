@@ -487,14 +487,16 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
             label_cls = label_cls.to(dev)
 
             # for regression
-            label_reg = y[data_config.label_names[-1]].float().to(dev)
+            label_reg = [y[n].float().to(dev).unsqueeze(1) for n in data_config.label_names[1:]]
+            label_reg = torch.cat(label_reg, dim=1)
+            n_reg = label_reg.shape[1]
 
             num_examples = label_reg.shape[0]
             opt.zero_grad()
             with torch.cuda.amp.autocast(enabled=grad_scaler is not None):
                 model_output = model(*inputs)
-                logits = _flatten_preds(model_output[:, :-1], label_mask)
-                preds_reg = model_output[:, -1]
+                logits = _flatten_preds(model_output[:, :-n_reg], label_mask)
+                preds_reg = model_output[:, -n_reg:]
                 loss, loss_monitor = loss_func(logits, preds_reg, label_cls, label_reg)
             if grad_scaler is None:
                 loss.backward()
@@ -530,16 +532,17 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
                 'Loss': '%.5f' % loss_monitor['cls'],
                 'LossReg': '%.5f' % loss_monitor['reg'],
                 'LossTot': '%.5f' % loss,
-                'AvgLoss': '%.5f' % (total_loss / num_batches),
+                # 'AvgLoss': '%.5f' % (total_loss / num_batches),
                 'Acc': '%.5f' % (correct / num_examples),
-                'AvgAcc': '%.5f' % (total_correct / count),
-                'MSE': '%.5f' % (sqr_err / num_examples),
-                'AvgMSE': '%.5f' % (sum_sqr_err / count),
-                'MAE': '%.5f' % (abs_err / num_examples),
-                'AvgMAE': '%.5f' % (sum_abs_err / count),
+                # 'AvgAcc': '%.5f' % (total_correct / count),
+                # 'MSE': '%.5f' % (sqr_err / num_examples),
+                # 'AvgMSE': '%.5f' % (sum_sqr_err / count),
+                # 'MAE': '%.5f' % (abs_err / num_examples),
+                # 'AvgMAE': '%.5f' % (sum_abs_err / count),
             })
 
-            if tb_helper:
+            # stop writing to tensorboard after 500 batches
+            if tb_helper and num_batches < 500:
                 tb_helper.write_scalars([
                     ("Loss/train", loss_monitor['cls'], tb_helper.batch_train_count + num_batches), # to compare cls loss to previous loss
                     ("LossReg/train", loss_monitor['reg'], tb_helper.batch_train_count + num_batches),
@@ -548,6 +551,11 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
                     ("MSE/train", sqr_err / num_examples, tb_helper.batch_train_count + num_batches),
                     # ("MAE/train", abs_err / num_examples, tb_helper.batch_train_count + num_batches),
                     ])
+                if n_reg > 1:
+                    for i in range(n_reg):
+                        tb_helper.write_scalars([
+                            (f"LossReg{i}/train", loss_monitor[f'reg_{i}'], tb_helper.batch_train_count + num_batches),
+                            ])
                 if tb_helper.custom_fn:
                     with torch.no_grad():
                         tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=num_batches, mode='train')
@@ -625,19 +633,22 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
                 label_cls = label_cls.to(dev)
 
                 # for regression
-                label_reg = y[data_config.label_names[-1]].float().to(dev)
+                label_reg = [y[n].float().to(dev).unsqueeze(1) for n in data_config.label_names[1:]]
+                label_reg = torch.cat(label_reg, dim=1)
+                n_reg = label_reg.shape[1]
 
                 model_output = model(*inputs)
-                logits = _flatten_preds(model_output[:, :-1], label_mask).float()
-                preds_reg = model_output[:, -1].float()
+                logits = _flatten_preds(model_output[:, :-n_reg], label_mask).float()
+                preds_reg = model_output[:, -n_reg:].float()
 
-                scores_cls.append(torch.softmax(logits, dim=1).detach().cpu().numpy())
-                scores_reg.append(preds_reg.detach().cpu().numpy())
-                for k, v in y.items():
-                    if k == '_label_':
-                        labels[k].append(_flatten_label(v, label_mask).cpu().numpy())
-                    else:
-                        labels[k].append(v.cpu().numpy())
+                if not for_training:
+                    scores_cls.append(torch.softmax(logits, dim=1).detach().cpu().numpy())
+                    scores_reg.append(preds_reg.detach().cpu().numpy())
+                    for k, v in y.items():
+                        if k == '_label_':
+                            labels[k].append(_flatten_label(v, label_mask).cpu().numpy())
+                        else:
+                            labels[k].append(v.cpu().numpy())
                 if not for_training:
                     for k, v in Z.items():
                         observers[k].append(v.cpu().numpy())
@@ -702,15 +713,17 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
             with torch.no_grad():
                 tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=-1, mode=tb_mode)
 
-    scores_cls = np.concatenate(scores_cls)
-    scores_reg = np.concatenate(scores_reg)
-    labels = {k: _concat(v) for k, v in labels.items()}
-    metric_results_cls = evaluate_metrics(labels['_label_'], scores_cls, eval_metrics=eval_metrics_cls)
-    metric_results_reg = evaluate_metrics(labels[data_config.label_names[-1]], scores_reg, eval_metrics=eval_metrics_reg)
-    _logger.info('Evaluation metric for cls: \n%s', '\n'.join(
-        ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results_cls.items()]))
-    _logger.info('Evaluation metrics for reg: \n%s', '\n'.join(
-        ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results_reg.items()]))
+    if not for_training:
+        scores_cls = np.concatenate(scores_cls)
+        scores_reg = np.concatenate(scores_reg)
+        labels = {k: _concat(v) for k, v in labels.items()}
+        metric_results_cls = evaluate_metrics(labels['_label_'], scores_cls, eval_metrics=eval_metrics_cls)
+        _logger.info('Evaluation metric for cls: \n%s', '\n'.join(
+            ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results_cls.items()]))
+        for i in range(n_reg):
+            metric_results_reg = evaluate_metrics(labels[data_config.label_names[i+1]], scores_reg[:, i], eval_metrics=eval_metrics_reg)
+            _logger.info(f'Evaluation metrics for reg_{i}: \n%s', '\n'.join(
+                ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results_reg.items()]))
 
     if for_training:
         return total_loss / count

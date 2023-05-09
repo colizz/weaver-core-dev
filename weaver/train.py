@@ -103,6 +103,8 @@ parser.add_argument('--batch-size', type=int, default=128,
                     help='batch size')
 parser.add_argument('--use-amp', action='store_true', default=False,
                     help='use mixed precision training (fp16)')
+parser.add_argument('--compile-model', action='store_true', default=False,
+                    help='compile model (supported from PyTorch 2.0)')
 parser.add_argument('--gpus', type=str, default='0',
                     help='device for the training/testing; to use CPU, set to empty string (""); to use multiple gpu, set it as a comma separated list, e.g., `1,2,3,4`')
 parser.add_argument('--predict-gpus', type=str, default=None,
@@ -120,7 +122,7 @@ parser.add_argument('--io-test', action='store_true', default=False,
                     help='test throughput of the dataloader')
 parser.add_argument('--copy-inputs', action='store_true', default=False,
                     help='copy input files to the current dir (can help to speed up dataloading when running over remote files, e.g., from EOS)')
-parser.add_argument('--log', type=str, default='',
+parser.add_argument('--log-file', type=str, default='',
                     help='path to the log file; `{auto}` can be used as part of the path to auto-generate a name, based on the timestamp and network configuration')
 parser.add_argument('--print', action='store_true', default=False,
                     help='do not run training/prediction but only print model information, e.g., FLOPs and number of parameters of a model')
@@ -545,6 +547,8 @@ def model_setup(args, data_config):
     if args.use_amp:
         network_options['use_amp'] = True
     model, model_info = network_module.get_model(data_config, **network_options)
+    if args.compile_model:
+        model = torch.compile(model)
     if args.load_model_weights:
         if args.load_model_weights == 'finetune_gghww_custom':
             model_state = torch.load("/home/olympus/licq/hww/incl-train/weaver-core/weaver/model/ak8_MD_vminclv2ParT_manual_fixwrap/net_best_epoch_state.pt", map_location='cpu')
@@ -557,7 +561,7 @@ def model_setup(args, data_config):
             _logger.info('Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s' %
                         (args.load_model_weights, missing_keys, unexpected_keys))
     # _logger.info(model)
-    flops(model, model_info)
+    # flops(model, model_info)
     # loss function
     try:
         loss_func = network_module.get_loss(data_config, **network_options)
@@ -606,13 +610,27 @@ def save_root(args, output_path, data_config, scores, labels, observers):
     from utils.data.fileio import _write_root
     output = {}
     scores_cls, scores_reg = (scores, None) if args.train_mode == 'cls' else (None, scores) if args.train_mode == 'regression' else scores
-    if args.train_mode in ['regression', 'hybrid']:
-        output[data_config.label_names[-1]] = labels[data_config.label_names[-1]]
-        output['output'] = scores_reg
+    # write regression nodes
+    if args.train_mode == 'regression':
+        for idx in range(len(data_config.label_names)):
+            name = data_config.label_names[idx]
+            output[name] = labels[name]
+            output['output_' + name] = scores_reg[:, idx]
+    if args.train_mode == 'hybrid':
+        for idx in range(1, len(data_config.label_names)):
+            name = data_config.label_names[idx]
+            output[name] = labels[name]
+            output['output_' + name] = scores_reg[:, idx-1]
+    # write classification nodes
     if args.train_mode in ['cls', 'hybrid']:
-        for idx, label_name in enumerate(data_config.label_value):
-            output[label_name] = (labels[data_config.label_names[0]] == idx)
-            output['score_' + label_name] = scores_cls[:, idx]
+        if data_config.label_value is not None:
+            for idx, label_name in enumerate(data_config.label_value):
+                output[label_name] = (labels['_label_'] == idx)
+                output['score_' + label_name] = scores_cls[:, idx]
+        else:
+            output['cls_index'] = labels['_label_'] # classes can be too many, only store the index
+            for idx, label_name in enumerate(data_config.label_value_cls_names):
+                output['score_' + label_name] = scores_cls[:, idx]
     for k, v in labels.items():
         if k == data_config.label_names[0]:
             continue
@@ -674,7 +692,8 @@ def _main(args):
             torch.cuda.set_device(local_rank)
             gpus = [local_rank]
             dev = torch.device(local_rank)
-            torch.distributed.init_process_group(backend=args.backend)
+            import datetime
+            torch.distributed.init_process_group(backend=args.backend, timeout=datetime.timedelta(seconds=5400))
             _logger.info(f'Using distributed PyTorch with {args.backend} backend')
         else:
             gpus = [int(i) for i in args.gpus.split(',')]
@@ -682,6 +701,9 @@ def _main(args):
     else:
         gpus = None
         dev = torch.device('cpu')
+    
+    # torch configs
+    torch.set_float32_matmul_precision('high')
 
     # load data
     if training_mode:
@@ -862,7 +884,7 @@ def main():
     if args.steps_per_epoch_val is not None and args.steps_per_epoch_val < 0:
         args.steps_per_epoch_val = None
 
-    if '{auto}' in args.model_prefix or '{auto}' in args.log:
+    if '{auto}' in args.model_prefix or '{auto}' in args.log_file:
         import hashlib
         import time
         model_name = time.strftime('%Y%m%d-%H%M%S') + "_" + os.path.basename(args.network_config).replace('.py', '')
@@ -872,7 +894,7 @@ def main():
                                                             optim=args.optimizer, batch=args.batch_size)
         args._auto_model_name = model_name
         args.model_prefix = args.model_prefix.replace('{auto}', model_name)
-        args.log = args.log.replace('{auto}', model_name)
+        args.log_file = args.log_file.replace('{auto}', model_name)
         if args.tensorboard is not None:
             args.tensorboard = args.tensorboard.replace('{auto}', model_name)
         print('Using auto-generated model prefix %s' % args.model_prefix)
@@ -884,10 +906,12 @@ def main():
 
     stdout = sys.stdout
     if args.local_rank is not None:
-        args.log += '.%03d' % args.local_rank
+        args.log_file += '.%03d' % args.local_rank
+        if args.tensorboard is not None:
+            args.tensorboard += '.%03d' % args.local_rank
         if args.local_rank != 0:
             stdout = None
-    _configLogger('weaver', stdout=stdout, filename=args.log)
+    _configLogger('weaver', stdout=stdout, filename=args.log_file)
 
     _main(args)
 

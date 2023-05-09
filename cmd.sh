@@ -907,3 +907,36 @@ $DATAPATH'/20220915_ak8_UL17_v5/Spin0ToTT_VariableMass_W*_MX-600to6000_MH-15to25
 --network-config $HOME/hww/incl-train/weaver-core/weaver/networks/particle_net_pf_sv_mass_regression.py \
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
 --log $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
+
+# 23.04.22
+NGPUS=2
+PREFIX=ak8_MD_vminclv2_pre2 ## needs modification
+config=$HOME/hww/incl-train/weaver-core/weaver/data_new/incl/${PREFIX//./_}.yaml
+DATAPATH=/mldata/licq/deepjetak8
+
+CUDA_VISIBLE_DEVICES=0,1 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS $HOME/hww/incl-train/weaver-core/weaver/train.py \
+--train-mode hybrid -o loss_gamma 0.05 \
+--batch-size 512 --start-lr 5e-3 --num-epochs 30 --optimizer ranger \
+--backend nccl --data-train \
+$DATAPATH'/20220625_ak8_UL17_v4/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/01/*.root' \
+$DATAPATH'/20220915_ak8_UL17_v5/BulkGravitonToHHTo4QTau_MX-600to6000_MH-15to250/*/*.root' \
+$DATAPATH'/20220625_ak8_UL17_v4/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass/*/*.root' \
+$DATAPATH'/20220915_ak8_UL17_v5/Spin0ToTT_VariableMass_W*_MX-600to6000_MH-15to250/*/*.root' \
+--samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
+--data-config ${config} --num-workers 5 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/particle_net_pf_sv_hybrid.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net
+
+PREFIX=ak8_MD_vminclv2ParT_manual_fixwrap ## needs modification
+config=$HOME/hww/incl-train/weaver-core/weaver/data_new/incl/${PREFIX//./_}.yaml
+DATAPATH=/mldata/licq/deepjetak8
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py \
+--train-mode hybrid -o loss_gamma 0.05 \
+--batch-size 256 --start-lr 5e-3 --num-epochs 30 --optimizer ranger \
+--gpus 0 --data-train \
+$DATAPATH'/20220915_ak8_UL17_v5/BulkGravitonToHHTo4QTau_MX-600to6000_MH-15to250/*/*0.root' \
+--samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
+--data-config ${config} --num-workers 5 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformerTagger_hybrid.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net

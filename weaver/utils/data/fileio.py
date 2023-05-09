@@ -41,7 +41,7 @@ def construct_jagged(target, length, builder):
     return builder
 
 def _read_root(filepath, branches, load_range=None, treename=None):
-    # '''
+    '''
     # for training with v4 and v5
     specific_vars = {
         # keywords: variable list
@@ -179,7 +179,7 @@ def _read_root(filepath, branches, load_range=None, treename=None):
     specific_vars_included = {
         "True": ['label_H_ww4q_0c', 'label_H_ww4q_1c', 'label_H_ww4q_2c', 'label_H_ww3q_0c', 'label_H_ww3q_1c', 'label_H_ww3q_2c', 'label_H_wwevqq_0c', 'label_H_wwevqq_1c', 'label_H_wwmvqq_0c', 'label_H_wwmvqq_1c', 'label_H_wwleptauevqq_0c', 'label_H_wwleptauevqq_1c', 'label_H_wwleptaumvqq_0c', 'label_H_wwleptaumvqq_1c', 'label_H_wwhadtauvqq_0c', 'label_H_wwhadtauvqq_1c'],
     }
-    # '''
+    '''
     '''
     # for training with v6
     specific_vars = {
@@ -221,6 +221,10 @@ def _read_root(filepath, branches, load_range=None, treename=None):
         "True": ['label_H_ww4q_0c', 'label_H_ww4q_1c', 'label_H_ww4q_2c', 'label_H_ww3q_0c', 'label_H_ww3q_1c', 'label_H_ww3q_2c', 'label_H_wwevqq_0c', 'label_H_wwevqq_1c', 'label_H_wwmvqq_0c', 'label_H_wwmvqq_1c', 'label_H_wwleptauevqq_0c', 'label_H_wwleptauevqq_1c', 'label_H_wwleptaumvqq_0c', 'label_H_wwleptaumvqq_1c', 'label_H_wwhadtauvqq_0c', 'label_H_wwhadtauvqq_1c', 'fj_gendau1_mass', 'fj_gendau2_mass'],
     }
     '''
+    # for training with v7 and on
+    specific_vars = {}
+    specific_vars_included = {}
+
     def remove_branch(branches, filepath):
         for expr, new_branch_dict in specific_vars.items():
             if eval(expr):
