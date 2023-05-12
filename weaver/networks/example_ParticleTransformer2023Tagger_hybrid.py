@@ -5,15 +5,14 @@ from torch import Tensor
 from weaver.utils.logger import _logger
 from weaver.utils.import_tools import import_module
 
-ParticleTransformerTagger = import_module(
-    os.path.join(os.path.dirname(__file__), 'ParticleTransformer2023.py'), 'ParT').ParticleTransformerTagger
+ParT = import_module(os.path.join(os.path.dirname(__file__), 'ParticleTransformer2023.py'), 'ParT')
 
 
 def get_model(data_config, **kwargs):
 
     cfg = dict(
-        pf_input_dim=len(data_config.input_dicts['pf_features']),
-        sv_input_dim=len(data_config.input_dicts['sv_features']),
+        # pf_input_dim=len(data_config.input_dicts['pf_features']),
+        # sv_input_dim=len(data_config.input_dicts['sv_features']),
         num_classes=data_config.label_value_cls_num + data_config.label_value_reg_num,
         # network configurations
         pair_input_dim=4,
@@ -35,10 +34,25 @@ def get_model(data_config, **kwargs):
         for_inference=False,
     )
     kwargs.pop('loss_gamma')
-    cfg.update(**kwargs)
-    _logger.info('Model config: %s' % str(cfg))
 
-    model = ParticleTransformerTagger(**cfg)
+    three_coll = kwargs.pop('three_coll', False)
+    if not three_coll:
+        cfg.update(dict(
+            pf_input_dim=len(data_config.input_dicts['pf_features']),
+            sv_input_dim=len(data_config.input_dicts['sv_features']),
+        ))
+        cfg.update(**kwargs)
+        model = ParT.ParticleTransformerTagger(**cfg)
+    else:
+        cfg.update(dict(
+            cpf_input_dim=len(data_config.input_dicts['cpf_features']),
+            npf_input_dim=len(data_config.input_dicts['npf_features']),
+            sv_input_dim=len(data_config.input_dicts['sv_features']),
+        ))
+        cfg.update(**kwargs)
+        model = ParT.ParticleTransformerTagger_3coll(**cfg)
+    
+    _logger.info('Model config: %s' % str(cfg))
 
     model_info = {
         'input_names': list(data_config.input_names),

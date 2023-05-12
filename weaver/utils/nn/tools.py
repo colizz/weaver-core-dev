@@ -467,6 +467,7 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
     total_loss = 0
     total_loss_cls = 0
     total_loss_reg = 0
+    total_loss_reg_i = defaultdict(float)
     num_batches = 0
     total_correct = 0
     sum_abs_err = 0
@@ -519,6 +520,9 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
             total_loss += loss
             total_loss_cls += loss_monitor['cls']
             total_loss_reg += loss_monitor['reg']
+            if n_reg > 1:
+                for i in range(n_reg):
+                    total_loss_reg_i[i] += loss_monitor[f'reg_{i}']
             total_correct += correct
 
             e = preds_reg - label_reg
@@ -579,6 +583,11 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
             ("MSE/train (epoch)", sum_sqr_err / count, epoch),
             ("MAE/train (epoch)", sum_abs_err / count, epoch),
             ])
+        if n_reg > 1:
+            for i in range(n_reg):
+                tb_helper.write_scalars([
+                    (f"LossReg{i}/train (epoch)", total_loss_reg_i[i] / num_batches, epoch),
+                    ])
         if tb_helper.custom_fn:
             with torch.no_grad():
                 tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=-1, mode='train')
@@ -614,6 +623,8 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
     labels_counts = []
     observers = defaultdict(list)
     start_time = time.time()
+    model_embed_output_array = []
+    label_cls_array = []
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for X, y, Z in tq:
@@ -627,7 +638,7 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
                     label_mask = None
                 if not for_training and label_mask is not None:
                     labels_counts.append(np.squeeze(label_mask.numpy().sum(axis=-1)))
-                label_clslabel_cls = _flatten_label(label_cls, label_mask)
+                label_cls = _flatten_label(label_cls, label_mask)
                 num_examples = label_cls.shape[0]
                 label_counter.update(label_cls.cpu().numpy())
                 label_cls = label_cls.to(dev)
@@ -638,6 +649,11 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
                 n_reg = label_reg.shape[1]
 
                 model_output = model(*inputs)
+                # ## a temporary hack: save the embeded space
+                # model_output, model_embed_output = model(*inputs, return_embed=True)
+                # model_embed_output_array.append(model_embed_output.detach().cpu().numpy())
+                # label_cls_array.append(label_cls.detach().cpu().numpy())
+
                 logits = _flatten_preds(model_output[:, :-n_reg], label_mask).float()
                 preds_reg = model_output[:, -n_reg:].float()
 
@@ -712,6 +728,8 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
         if tb_helper.custom_fn:
             with torch.no_grad():
                 tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=-1, mode=tb_mode)
+    ## a temporary hack: save the embeded space
+    # tb_helper.writer.add_embedding(np.concatenate(model_embed_output_array), metadata=[data_config.label_value_cls_names[val].replace('label_','') for val in np.concatenate(label_cls_array)], tag='embed')
 
     if not for_training:
         scores_cls = np.concatenate(scores_cls)

@@ -855,6 +855,7 @@ $DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHU
 // (now correct the LR: for DP, scale(double) the LR; for DDP, scale the size..)
 
 PREFIX=ak8_MD_inclv8_part_2reg_manual.useamp.lite.ddp-bs1024-lr3e-3
+PREFIX=ak8_MD_inclv8_part_2reg_manual.useamp.lite.ddp-bs768-lr2p25e-3
 config=$HOME/hww/incl-train/weaver-core/weaver/data_new/inclv7plus/${PREFIX%%.*}.yaml
 DATAPATH=/mldata/licq/deepjetak8
 DATAPATHIFR=/data/pubfs/licq/deepjetak8
@@ -863,7 +864,7 @@ NGPUS=3
 CUDA_VISIBLE_DEVICES=0,2,3 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
 $HOME/hww/incl-train/weaver-core/weaver/train.py \
 --train-mode hybrid -o loss_gamma 1 -o fc_params '[(512,0.1)]' -o embed_dims '[64,256,64]' -o pair_embed_dims '[32,32,32]' \
---use-amp --batch-size 1024 --start-lr 3e-3 --num-epochs 30 --optimizer ranger \
+--use-amp --batch-size 768 --start-lr 2.25e-3 --num-epochs 30 --optimizer ranger \
 --backend nccl --data-train \
 $DATAPATH'/20230504_ak8_UL17_v8/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
 $DATAPATH'/20230504_ak8_UL17_v8/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*.root' \
@@ -885,11 +886,12 @@ $DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHU
 --log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX} \
 --predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
 
-##### This is the formal one!!
+## This is the formal one!!
 
 ///PREFIX=ak8_MD_inclv8_part_2reg_manual.useamp.lite.bs2048-lr2e-3
 ///PREFIX=ak8_MD_inclv8_part_2reg_manual.useamp.lite.bs1536-lr1e-3
-PREFIX=ak8_MD_inclv8_part_2reg_manual.useamp.lite.dp-bs3072-lr1e-3
+///PREFIX=ak8_MD_inclv8_part_2reg_manual.useamp.lite.dp-bs3072-lr1e-3
+PREFIX=ak8_MD_inclv8_part_2reg_manual.useamp.lite.dp-bs2048-lr0p6e-3.try4
 config=$HOME/hww/incl-train/weaver-core/weaver/data_new/inclv7plus/${PREFIX%%.*}.yaml
 DATAPATH=/mldata/licq/deepjetak8
 DATAPATHIFR=/data/pubfs/licq/deepjetak8
@@ -898,7 +900,7 @@ DATAPATHIFR=/data/pubfs/licq/deepjetak8
 NGPUS=1
 python $HOME/hww/incl-train/weaver-core/weaver/train.py \
 --train-mode hybrid -o loss_gamma 1 -o fc_params '[(512,0.1)]' -o embed_dims '[64,256,64]' -o pair_embed_dims '[32,32,32]' \
---use-amp --batch-size 3072 --start-lr 1e-3 --num-epochs 30 --optimizer ranger \
+--use-amp --batch-size 2048 --start-lr 0.6e-3 --num-epochs 30 --optimizer ranger --fetch-step 0.008 \
 --gpus 0,2,3 --data-train \
 $DATAPATH'/20230504_ak8_UL17_v8/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
 $DATAPATH'/20230504_ak8_UL17_v8/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*.root' \
@@ -914,7 +916,143 @@ $DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHU
 'qcd:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
 'ttbar:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root' \
 --samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
---data-config ${config} --num-workers 24 \
+--data-config ${config} --num-workers 30 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023Tagger_hybrid.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX} \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+// now run predict routine to get the embedding space
+NGPUS=1
+python $HOME/hww/incl-train/weaver-core/weaver/train.py \
+--train-mode hybrid -o loss_gamma 1 -o fc_params '[(512,0.1)]' -o embed_dims '[64,256,64]' -o pair_embed_dims '[32,32,32]' \
+--use-amp --batch-size 512 --start-lr 0.6e-3 --num-epochs 31 --optimizer ranger --fetch-step 0.008 \
+--gpus 0 --data-train \
+$DATAPATH'/20230504_ak8_UL17_v8/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*100.root' \
+--data-val \
+$DATAPATH'/20230504_ak8_UL17_v8/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/DiH1OrHpm_2HDM_HpmToBC_HpmToCS_H1ToBS_HT-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHUVariableZMass/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHUVariableZMass2DMesh/*.root' \
+--samples-per-epoch $((1 * 512 / $NGPUS)) --samples-per-epoch-val $((100 * 512)) \
+--data-config ${config} --num-workers 12 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023Tagger_hybrid.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}.test_embed/net --load-epoch 29 \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/embed.log --tensorboard _${PREFIX}.test_embed
+
+## Tune paramters (note: change to ParT2023_orig)
+
+PREFIX=ak8_MD_inclv8_part_2reg_manual.useamp.lite.gm5.dp-bs2048-lr2e-3
+config=$HOME/hww/incl-train/weaver-core/weaver/data_new/inclv7plus/${PREFIX%%.*}.yaml
+DATAPATH=/mldata/licq/deepjetak8
+DATAPATHIFR=/data/pubfs/licq/deepjetak8
+
+NGPUS=1
+python $HOME/hww/incl-train/weaver-core/weaver/train.py \
+--train-mode hybrid -o loss_gamma 5 -o fc_params '[(512,0.1)]' -o embed_dims '[64,256,64]' -o pair_embed_dims '[32,32,32]' \
+--use-amp --batch-size 2048 --start-lr 2e-3 --num-epochs 30 --optimizer ranger --fetch-step 0.008 \
+--gpus 1,2,3 --data-train \
+$DATAPATH'/20230504_ak8_UL17_v8/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/DiH1OrHpm_2HDM_HpmToBC_HpmToCS_H1ToBS_HT-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHUVariableZMass/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHUVariableZMass2DMesh/*.root' \
+--data-test \
+'hww:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4W_JHUGen_M-1000_narrow/*.root' \
+'higgs2p:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_M-1000_narrow/*.root' \
+'qcd:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
+'ttbar:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root' \
+--samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
+--data-config ${config} --num-workers 30 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023Tagger_hybrid.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX} \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+## Tune paramters (note: change to ParT2023_orig, use DDP)
+
+PREFIX=ak8_MD_inclv8_part_2reg_manual.useamp.lite.gm5.ddp-bs768-lr6p75e-3
+config=$HOME/hww/incl-train/weaver-core/weaver/data_new/inclv7plus/${PREFIX%%.*}.yaml
+DATAPATH=/mldata/licq/deepjetak8
+DATAPATHIFR=/data/pubfs/licq/deepjetak8
+
+NGPUS=3
+CUDA_VISIBLE_DEVICES=1,2,3 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
+$HOME/hww/incl-train/weaver-core/weaver/train.py \
+--train-mode hybrid -o loss_gamma 5 -o fc_params '[(512,0.1)]' -o embed_dims '[64,256,64]' -o pair_embed_dims '[32,32,32]' \
+--use-amp --batch-size 768 --start-lr 6.75e-3 --num-epochs 30 --optimizer ranger \
+--backend nccl --data-train \
+$DATAPATH'/20230504_ak8_UL17_v8/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/DiH1OrHpm_2HDM_HpmToBC_HpmToCS_H1ToBS_HT-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHUVariableZMass/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHUVariableZMass2DMesh/*.root' \
+--data-test \
+'hww:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4W_JHUGen_M-1000_narrow/*.root' \
+'higgs2p:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_M-1000_narrow/*.root' \
+'qcd:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/QCD_Pt_170toInf_ptBinned_TuneCP5_13##TeV_pythia8/*.root' \
+'ttbar:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root' \
+--samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
+--data-config ${config} --num-workers 8 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023Tagger_hybrid.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX} \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+# 23.05.12 Study input variables with ParT-lite
+
+PREFIX=ak8_MD_inclv8_part_addlosttrk_manual.useamp.lite.gm5.ddp-bs768-lr6p75e-3
+config=$HOME/hww/incl-train/weaver-core/weaver/data_new/inclv7plus/${PREFIX%%.*}.yaml
+DATAPATH=/mldata/licq/deepjetak8
+DATAPATHIFR=/data/pubfs/licq/deepjetak8
+
+## v8 test training
+python $HOME/hww/incl-train/weaver-core/weaver/train.py \
+--train-mode hybrid -o three_coll True -o loss_gamma 5 -o fc_params '[(512,0.1)]' -o embed_dims '[64,256,64]' -o pair_embed_dims '[32,32,32]' \
+--use-amp --batch-size 768 --start-lr 1.5e-3 --num-epochs 50 --optimizer ranger \
+--gpus 0 --data-train \
+$DATAPATH'/20230504_ak8_UL17_v8/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*100.root' \
+--data-test \
+'test:'$DATAPATH'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_M-1000_narrow/dnntuple_15898358-10.root' \
+--samples-per-epoch $((15000 * 512)) --samples-per-epoch-val $((1000 * 512)) \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023Tagger_hybrid.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root --in-memory
+
+## Formal training
+
+NGPUS=3
+CUDA_VISIBLE_DEVICES=0,1,2 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
+$HOME/hww/incl-train/weaver-core/weaver/train.py \
+--train-mode hybrid -o three_coll True -o loss_gamma 5 -o fc_params '[(512,0.1)]' -o embed_dims '[64,256,64]' -o pair_embed_dims '[32,32,32]' \
+--use-amp --batch-size 768 --start-lr 6.75e-3 --num-epochs 30 --optimizer ranger --fetch-step 0.008 \
+--backend nccl --data-train \
+$DATAPATH'/20230504_ak8_UL17_v8/QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/DiH1OrHpm_2HDM_HpmToBC_HpmToCS_H1ToBS_HT-600to6000_MH-15to250/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4W_MX-600to6000_MH-15to250_JHUVariableWMass2DMesh/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHUVariableZMass/*.root' \
+$DATAPATH'/20230504_ak8_UL17_v8/BulkGravitonToHHTo4Z_MX-600to6000_MH-15to250_JHUVariableZMass2DMesh/*.root' \
+--data-test \
+'hww:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4W_JHUGen_M-1000_narrow/*.root' \
+'higgs2p:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_M-1000_narrow/*.root' \
+'qcd:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/QCD_Pt_170toInf_ptBinned_TuneCP5_13##TeV_pythia8/*.root' \
+'ttbar:'$DATAPATHIFR'/20230504_ak8_UL17_v8/infer/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root' \
+--samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
+--data-config ${config} --num-workers 8 \
 --network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023Tagger_hybrid.py \
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
 --log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX} \

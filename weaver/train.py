@@ -561,7 +561,7 @@ def model_setup(args, data_config):
             _logger.info('Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s' %
                         (args.load_model_weights, missing_keys, unexpected_keys))
     # _logger.info(model)
-    # flops(model, model_info)
+    flops(model, model_info)
     # loss function
     try:
         loss_func = network_module.get_loss(data_config, **network_options)
@@ -612,10 +612,9 @@ def save_root(args, output_path, data_config, scores, labels, observers):
     scores_cls, scores_reg = (scores, None) if args.train_mode == 'cls' else (None, scores) if args.train_mode == 'regression' else scores
     # write regression nodes
     if args.train_mode == 'regression':
-        for idx in range(len(data_config.label_names)):
-            name = data_config.label_names[idx]
-            output[name] = labels[name]
-            output['output_' + name] = scores_reg[:, idx]
+        name = data_config.label_names[0]
+        output[name] = labels[name]
+        output['output_' + name] = scores_reg
     if args.train_mode == 'hybrid':
         for idx in range(1, len(data_config.label_names)):
             name = data_config.label_names[idx]

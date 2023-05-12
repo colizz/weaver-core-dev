@@ -908,6 +908,40 @@ $DATAPATH'/20220915_ak8_UL17_v5/Spin0ToTT_VariableMass_W*_MX-600to6000_MH-15to25
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
 --log $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
 
+### then inference the ofcttbar samples for both cls-only and reg-only
+GPU=1
+PREFIX=ak8_MD_vminclv2_pre2_regonly_manual ## needs modification
+config=$HOME/hww/incl-train/weaver-core/weaver/data_new/incl/${PREFIX//./_}_inferofcttbarv6.yaml
+DATAPATH=/mldata/licq/deepjetak8
+DATAPATHIFR=/data/pubfs/licq/deepjetak8
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode regression --predict \
+--batch-size 512 --gpus $GPU \
+--data-test \
+'ofcttbarsemilep:'$DATAPATHIFR'/20221023_ak8_UL17_v6/TTToSemiLeptonic_TuneCP5_13TeV-powheg-pythia8/01/*.root' \
+'ofcttbarfulllep:'$DATAPATHIFR'/20221023_ak8_UL17_v6/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/01/*.root' \
+--data-config ${config} \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/particle_net_pf_sv_mass_regression.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+GPU=1
+PREFIX=ak8_MD_vminclv2_pre2_noreg_manual ## needs modification
+config=$HOME/hww/incl-train/weaver-core/weaver/data_new/incl/${PREFIX//./_}_inferofcttbarv6.yaml
+DATAPATH=/mldata/licq/deepjetak8
+DATAPATHIFR=/data/pubfs/licq/deepjetak8
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
+--batch-size 512 --gpus $GPU \
+--data-test \
+'ofcttbarsemilep:'$DATAPATHIFR'/20221023_ak8_UL17_v6/TTToSemiLeptonic_TuneCP5_13TeV-powheg-pythia8/01/*.root' \
+'ofcttbarfulllep:'$DATAPATHIFR'/20221023_ak8_UL17_v6/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/01/*.root' \
+--data-config ${config} \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/particle_net_pf_sv.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+
 # 23.04.22
 NGPUS=2
 PREFIX=ak8_MD_vminclv2_pre2 ## needs modification

@@ -22,21 +22,29 @@ def delta_r2(eta1, phi1, eta2, phi2):
     return (eta1 - eta2)**2 + delta_phi(phi1, phi2)**2
 
 
-def to_pt2(x, eps=1e-8):
+@torch.jit.script
+def to_pt2(x):
     pt2 = x[:, :2].square().sum(dim=1, keepdim=True)
-    if eps is not None:
-        pt2 = pt2.clamp(min=eps)
+    pt2 = pt2.clamp(min=1e-8)
     return pt2
 
 
-def to_m2(x, eps=1e-8):
+@torch.jit.script
+def to_m2(x):
     m2 = x[:, 3:4].square() - x[:, :3].square().sum(dim=1, keepdim=True)
-    if eps is not None:
-        m2 = m2.clamp(min=eps)
+    m2 = m2.clamp(min=1e-8)
     return m2
 
 
+@torch.jit.script
+def to_m2_noclamp(x):
+    m2 = x[:, 3:4].square() - x[:, :3].square().sum(dim=1, keepdim=True)
+    return m2
+
+
+@torch.jit.script
 def atan2(y, x):
+    # only used in onnx
     sx = torch.sign(x)
     sy = torch.sign(y)
     pi_part = (sy + sx * (sy ** 2 - 1)) * (sx - 1) * (-math.pi / 2)
@@ -44,26 +52,32 @@ def atan2(y, x):
     return atan_part + pi_part
 
 
-def to_ptrapphim(x, return_mass=True, eps=1e-8, for_onnx=False):
+@torch.jit.script
+def to_ptrapphim(x):
+    return_mass = False
+    for_onnx = False
     # x: (N, 4, ...), dim1 : (px, py, pz, E)
     px, py, pz, energy = x.split((1, 1, 1, 1), dim=1)
-    pt = torch.sqrt(to_pt2(x, eps=eps))
+    pt = torch.sqrt(to_pt2(x))
     # rapidity = 0.5 * torch.log((energy + pz) / (energy - pz))
     rapidity = 0.5 * torch.log(1 + (2 * pz) / (energy - pz).clamp(min=1e-20))
-    phi = (atan2 if for_onnx else torch.atan2)(py, px)
+
+    # phi = (atan2 if for_onnx else torch.atan2)(py, px)
+    phi = torch.atan2(py, px) # use the non-onnx implementation for training first
     if not return_mass:
         return torch.cat((pt, rapidity, phi), dim=1)
     else:
-        m = torch.sqrt(to_m2(x, eps=eps))
+        m = torch.sqrt(to_m2(x))
         return torch.cat((pt, rapidity, phi, m), dim=1)
 
 
-def boost(x, boostp4, eps=1e-8):
+@torch.jit.script
+def boost(x, boostp4):
     # boost x to the rest frame of boostp4
     # x: (N, 4, ...), dim1 : (px, py, pz, E)
-    p3 = -boostp4[:, :3] / boostp4[:, 3:].clamp(min=eps)
+    p3 = -boostp4[:, :3] / boostp4[:, 3:].clamp(min=1e-8)
     b2 = p3.square().sum(dim=1, keepdim=True)
-    gamma = (1 - b2).clamp(min=eps)**(-0.5)
+    gamma = (1 - b2).clamp(min=1e-8)**(-0.5)
     gamma2 = (gamma - 1) / b2
     gamma2.masked_fill_(b2 == 0, 0)
     bp = (x[:, :3] * p3).sum(dim=1, keepdim=True)
@@ -71,38 +85,44 @@ def boost(x, boostp4, eps=1e-8):
     return v
 
 
-def p3_norm(p, eps=1e-8):
-    return p[:, :3] / p[:, :3].norm(dim=1, keepdim=True).clamp(min=eps)
+@torch.jit.script
+def p3_norm(p):
+    return p[:, :3] / torch.linalg.vector_norm(p[:, :3], dim=1, keepdim=True).clamp(min=1e-8)
 
 
-def pairwise_lv_fts(xi, xj, num_outputs=4, eps=1e-8, for_onnx=False):
-    pti, rapi, phii = to_ptrapphim(xi, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
-    ptj, rapj, phij = to_ptrapphim(xj, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
+@torch.jit.script
+def pairwise_lv_fts(xi, xj):
+    num_outputs = 4
+    for_onnx = False
+
+    pti, rapi, phii = to_ptrapphim(xi).split((1, 1, 1), dim=1)
+    ptj, rapj, phij = to_ptrapphim(xj).split((1, 1, 1), dim=1)
 
     delta = delta_r2(rapi, phii, rapj, phij).sqrt()
-    lndelta = torch.log(delta.clamp(min=eps))
+    lndelta = torch.log(delta.clamp(min=1e-8))
+    xij = xi + xj
     if num_outputs == 1:
         return lndelta
 
+    outputs = []
     if num_outputs > 1:
         ptmin = ((pti <= ptj) * pti + (pti > ptj) * ptj) if for_onnx else torch.minimum(pti, ptj)
-        lnkt = torch.log((ptmin * delta).clamp(min=eps))
-        lnz = torch.log((ptmin / (pti + ptj).clamp(min=eps)).clamp(min=eps))
-        outputs = [lnkt, lnz, lndelta]
+        lnkt = torch.log((ptmin * delta).clamp(min=1e-8))
+        lnz = torch.log((ptmin / (pti + ptj).clamp(min=1e-8)).clamp(min=1e-8))
+        outputs.extend([lnkt, lnz, lndelta])
 
     if num_outputs > 3:
-        xij = xi + xj
-        lnm2 = torch.log(to_m2(xij, eps=eps))
+        lnm2 = torch.log(to_m2(xij))
         outputs.append(lnm2)
 
     if num_outputs > 4:
-        lnds2 = torch.log(torch.clamp(-to_m2(xi - xj, eps=None), min=eps))
+        lnds2 = torch.log(torch.clamp(-to_m2_noclamp(xi - xj), min=1e-8))
         outputs.append(lnds2)
 
     # the following features are not symmetric for (i, j)
     if num_outputs > 5:
         xj_boost = boost(xj, xij)
-        costheta = (p3_norm(xj_boost, eps=eps) * p3_norm(xij, eps=eps)).sum(dim=1, keepdim=True)
+        costheta = (p3_norm(xj_boost) * p3_norm(xij)).sum(dim=1, keepdim=True)
         outputs.append(costheta)
 
     if num_outputs > 6:
@@ -204,10 +224,11 @@ class SequenceTrimmer(nn.Module):
                 self._counter += 1
             else:
                 if self.training:
-                    # q = min(1, random.uniform(*self.target))
-                    # maxlen = torch.quantile(mask.type_as(x).sum(dim=-1), q).long()
-                    q = torch.min(torch.ones(1, device=mask.device), torch.rand(1, device=mask.device) * (self.target[1] - self.target[0]) + self.target[0])[0]
+                    q = min(1, random.uniform(*self.target))
                     maxlen = torch.quantile(mask.type_as(x).sum(dim=-1), q).long()
+                    ## below used to pass compilation
+                    # q = torch.min(torch.ones(1, device=mask.device), torch.rand(1, device=mask.device) * (self.target[1] - self.target[0]) + self.target[0])[0]
+                    # maxlen = torch.quantile(mask.type_as(x).sum(dim=-1), q).long()
                     rand = torch.rand_like(mask.type_as(x))
                     rand.masked_fill_(~mask, -1)
                     perm = rand.argsort(dim=-1, descending=True)  # (N, 1, P)
@@ -265,12 +286,13 @@ class PairEmbed(nn.Module):
         super().__init__()
 
         self.pairwise_lv_dim = pairwise_lv_dim
+        assert pairwise_lv_dim == 4
         self.pairwise_input_dim = pairwise_input_dim
         self.is_symmetric = (pairwise_lv_dim <= 5) and (pairwise_input_dim == 0)
         self.remove_self_pair = remove_self_pair
         self.mode = mode
         self.for_onnx = for_onnx
-        self.pairwise_lv_fts = partial(pairwise_lv_fts, num_outputs=pairwise_lv_dim, eps=eps, for_onnx=for_onnx)
+        self.pairwise_lv_fts = pairwise_lv_fts
         self.out_dim = dims[-1]
 
         if self.mode == 'concat':
@@ -544,7 +566,7 @@ class ParticleTransformer(nn.Module):
     def no_weight_decay(self):
         return {'cls_token', }
 
-    def forward(self, x, v=None, mask=None, uu=None, uu_idx=None, return_embed=False):
+    def forward(self, x, v=None, mask=None, uu=None, uu_idx=None):
         # x: (N, C, P)
         # v: (N, 4, P) [px,py,pz,energy]
         # mask: (N, 1, P) -- real particle = 1, padded = 0
@@ -583,10 +605,7 @@ class ParticleTransformer(nn.Module):
             if self.for_inference:
                 output = torch.softmax(output, dim=1)
             # print('output:\n', output)
-            if return_embed == False:
-                return output
-            else:
-                return output, x_cls
+            return output
 
 
 class ParticleTransformerTagger(nn.Module):
@@ -651,7 +670,7 @@ class ParticleTransformerTagger(nn.Module):
     def no_weight_decay(self):
         return {'part.cls_token', }
 
-    def forward(self, pf_x, pf_v=None, pf_mask=None, sv_x=None, sv_v=None, sv_mask=None, return_embed=False):
+    def forward(self, pf_x, pf_v=None, pf_mask=None, sv_x=None, sv_v=None, sv_mask=None):
         # x: (N, C, P)
         # v: (N, 4, P) [px,py,pz,energy]
         # mask: (N, 1, P) -- real particle = 1, padded = 0
@@ -667,92 +686,7 @@ class ParticleTransformerTagger(nn.Module):
             sv_x = self.sv_embed(sv_x)
             x = torch.cat([pf_x, sv_x], dim=0)
 
-            return self.part(x, v, mask, return_embed=return_embed)
-
-class ParticleTransformerTagger_3coll(nn.Module):
-
-    def __init__(self,
-                 cpf_input_dim,
-                 npf_input_dim,
-                 sv_input_dim,
-                 num_classes=None,
-                 # network configurations
-                 pair_input_dim=4,
-                 pair_extra_dim=0,
-                 remove_self_pair=False,
-                 use_pre_activation_pair=True,
-                 embed_dims=[128, 512, 128],
-                 pair_embed_dims=[64, 64, 64],
-                 num_heads=8,
-                 num_layers=8,
-                 num_cls_layers=2,
-                 block_params=None,
-                 cls_block_params={'dropout': 0, 'attn_dropout': 0, 'activation_dropout': 0},
-                 fc_params=[],
-                 activation='gelu',
-                 enable_mem_efficient=False,
-                 # misc
-                 trim=True,
-                 for_inference=False,
-                 use_amp=False,
-                 **kwargs) -> None:
-        super().__init__(**kwargs)
-
-        self.use_amp = use_amp
-
-        self.cpf_trimmer = SequenceTrimmer(enabled=trim and not for_inference)
-        self.npf_trimmer = SequenceTrimmer(enabled=trim and not for_inference)
-        self.sv_trimmer = SequenceTrimmer(enabled=trim and not for_inference)
-
-        self.cpf_embed = Embed(cpf_input_dim, embed_dims, activation=activation)
-        self.npf_embed = Embed(npf_input_dim, embed_dims, activation=activation)
-        self.sv_embed = Embed(sv_input_dim, embed_dims, activation=activation)
-
-        self.part = ParticleTransformer(input_dim=embed_dims[-1],
-                                        num_classes=num_classes,
-                                        # network configurations
-                                        pair_input_dim=pair_input_dim,
-                                        pair_extra_dim=pair_extra_dim,
-                                        remove_self_pair=remove_self_pair,
-                                        use_pre_activation_pair=use_pre_activation_pair,
-                                        embed_dims=[],
-                                        pair_embed_dims=pair_embed_dims,
-                                        num_heads=num_heads,
-                                        num_layers=num_layers,
-                                        num_cls_layers=num_cls_layers,
-                                        block_params=block_params,
-                                        cls_block_params=cls_block_params,
-                                        fc_params=fc_params,
-                                        activation=activation,
-                                        enable_mem_efficient=enable_mem_efficient,
-                                        # misc
-                                        trim=False,
-                                        for_inference=for_inference,
-                                        use_amp=use_amp)
-
-    @torch.jit.ignore
-    def no_weight_decay(self):
-        return {'part.cls_token', }
-
-    def forward(self, cpf_x, cpf_v=None, cpf_mask=None, npf_x=None, npf_v=None, npf_mask=None, sv_x=None, sv_v=None, sv_mask=None, return_embed=False):
-        # x: (N, C, P)
-        # v: (N, 4, P) [px,py,pz,energy]
-        # mask: (N, 1, P) -- real particle = 1, padded = 0
-
-        with torch.no_grad():
-            cpf_x, cpf_v, cpf_mask, _ = self.cpf_trimmer(cpf_x, cpf_v, cpf_mask)
-            npf_x, npf_v, npf_mask, _ = self.npf_trimmer(npf_x, npf_v, npf_mask)
-            sv_x, sv_v, sv_mask, _ = self.sv_trimmer(sv_x, sv_v, sv_mask)
-            v = torch.cat([cpf_v, npf_v, sv_v], dim=2)
-            mask = torch.cat([cpf_mask, npf_mask, sv_mask], dim=2)
-
-        with torch.cuda.amp.autocast(enabled=self.use_amp):
-            cpf_x = self.cpf_embed(cpf_x)  # after embed: (seq_len, batch, embed_dim)
-            npf_x = self.npf_embed(npf_x)  # after embed: (seq_len, batch, embed_dim)
-            sv_x = self.sv_embed(sv_x)
-            x = torch.cat([cpf_x, npf_x, sv_x], dim=0)
-
-            return self.part(x, v, mask, return_embed=return_embed)
+            return self.part(x, v, mask)
 
 
 class ParticleTransformerTaggerWithExtraPairFeatures(nn.Module):
