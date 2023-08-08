@@ -122,7 +122,7 @@ class _SimpleIter(object):
         self.__dict__.update(**kwargs)
 
         # executor to read files and run preprocessing asynchronously
-        self.executor = ThreadPoolExecutor(max_workers=1) if self._async_load else None
+        # self.executor = ThreadPoolExecutor(max_workers=1) if self._async_load else None
 
         # init: prefetch holds table and indices for the next fetch
         self.prefetch = None
@@ -206,8 +206,8 @@ class _SimpleIter(object):
                 if self.prefetch is None:
                     # reaching the end as prefetch got nothing
                     self.table = None
-                    if self._async_load:
-                        self.executor.shutdown(wait=False)
+                    # if self._async_load:
+                    #     self.executor.shutdown(wait=False)
                     raise StopIteration
                 # get result from prefetch
                 if self._async_load:
@@ -249,6 +249,11 @@ class _SimpleIter(object):
 
         # _logger.info('Start fetching next batch, len(filelist)=%d, load_range=%s'%(len(filelist), load_range))
         if self._async_load:
+            if hasattr(self, 'executor'):
+                self.executor.shutdown(wait=False)
+                del self.prefetch
+                del self.executor
+            self.executor = ThreadPoolExecutor(max_workers=1)
             self.prefetch = self.executor.submit(_load_next, self._data_config,
                                                  filelist, load_range, self._sampler_options)
         else:

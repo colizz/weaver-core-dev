@@ -75,9 +75,11 @@ def p3_norm(p, eps=1e-8):
     return p[:, :3] / p[:, :3].norm(dim=1, keepdim=True).clamp(min=eps)
 
 
-def pairwise_lv_fts(xi, xj, num_outputs=4, eps=1e-8, for_onnx=False):
+def pairwise_lv_fts(xi, xj, xsum, num_outputs=6, eps=1e-8, for_onnx=False):
+    assert num_outputs == 6
     pti, rapi, phii = to_ptrapphim(xi, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
     ptj, rapj, phij = to_ptrapphim(xj, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
+    ptall, *_ = to_ptrapphim(xsum, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
 
     delta = delta_r2(rapi, phii, rapj, phij).sqrt()
     lndelta = torch.log(delta.clamp(min=eps))
@@ -86,26 +88,30 @@ def pairwise_lv_fts(xi, xj, num_outputs=4, eps=1e-8, for_onnx=False):
 
     if num_outputs > 1:
         ptmin = ((pti <= ptj) * pti + (pti > ptj) * ptj) if for_onnx else torch.minimum(pti, ptj)
-        lnkt = torch.log((ptmin * delta).clamp(min=eps))
+        kt = (ptmin * delta).clamp(min=eps)
+        lnkt = torch.log(kt)
+        lnktrel = torch.log(kt / ptall)
         lnz = torch.log((ptmin / (pti + ptj).clamp(min=eps)).clamp(min=eps))
-        outputs = [lnkt, lnz, lndelta]
-
-    if num_outputs > 3:
-        xij = xi + xj
-        lnm2 = torch.log(to_m2(xij, eps=eps))
-        outputs.append(lnm2)
+        outputs = [lnkt, lnktrel, lnz, lndelta]
 
     if num_outputs > 4:
+        xij = xi + xj
+        mij2 = to_m2(xij, eps=eps)
+        lnm2 = torch.log(mij2)
+        lnm2rel = torch.log(mij2 / to_m2(xsum, eps=eps))
+        outputs.extend([lnm2, lnm2rel])
+
+    if num_outputs > 6:
         lnds2 = torch.log(torch.clamp(-to_m2(xi - xj, eps=None), min=eps))
         outputs.append(lnds2)
 
     # the following features are not symmetric for (i, j)
-    if num_outputs > 5:
+    if num_outputs > 7:
         xj_boost = boost(xj, xij)
         costheta = (p3_norm(xj_boost, eps=eps) * p3_norm(xij, eps=eps)).sum(dim=1, keepdim=True)
         outputs.append(costheta)
 
-    if num_outputs > 6:
+    if num_outputs > 8:
         deltarap = rapi - rapj
         deltaphi = delta_phi(phii, phij)
         outputs += [deltarap, deltaphi]
@@ -266,7 +272,7 @@ class PairEmbed(nn.Module):
 
         self.pairwise_lv_dim = pairwise_lv_dim
         self.pairwise_input_dim = pairwise_input_dim
-        self.is_symmetric = (pairwise_lv_dim <= 5) and (pairwise_input_dim == 0)
+        self.is_symmetric = True
         self.remove_self_pair = remove_self_pair
         self.mode = mode
         self.for_onnx = for_onnx
@@ -330,10 +336,11 @@ class PairEmbed(nn.Module):
                 i, j = torch.tril_indices(seq_len, seq_len, offset=-1 if self.remove_self_pair else 0,
                                           device=(x if x is not None else uu).device)
                 if x is not None:
+                    xsum = x.sum(dim=-1, keepdims=True)
                     x = x.unsqueeze(-1).repeat(1, 1, 1, seq_len)
                     xi = x[:, :, i, j]  # (batch, dim, seq_len*(seq_len+1)/2)
                     xj = x[:, :, j, i]
-                    x = self.pairwise_lv_fts(xi, xj)
+                    x = self.pairwise_lv_fts(xi, xj, xsum)
                 if uu is not None:
                     # (batch, dim, seq_len*(seq_len+1)/2)
                     uu = uu[:, :, i, j]
@@ -445,8 +452,7 @@ class Block(nn.Module):
         if self.c_attn is not None:
             tgt_len = x.size(0)
             x = x.view(tgt_len, -1, self.num_heads, self.head_dim)
-            # x = torch.einsum('tbhd,h->tbdh', x, self.c_attn)
-            x = x.permute(0, 1, 3, 2) * self.c_attn.reshape(1, 1, 1, -1)  # rewrite einsum
+            x = torch.einsum('tbhd,h->tbdh', x, self.c_attn)
             x = x.reshape(tgt_len, -1, self.embed_dim)
         if self.post_attn_norm is not None:
             x = self.post_attn_norm(x)
@@ -474,7 +480,7 @@ class ParticleTransformer(nn.Module):
                  input_dim,
                  num_classes=None,
                  # network configurations
-                 pair_input_dim=4,
+                 pair_input_dim=6,
                  pair_extra_dim=0,
                  remove_self_pair=False,
                  use_pre_activation_pair=True,
@@ -491,17 +497,13 @@ class ParticleTransformer(nn.Module):
                  # misc
                  trim=True,
                  for_inference=False,
-                 num_classes_cls=None, # for onnx export
                  use_amp=False,
-                 return_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
         self.trimmer = SequenceTrimmer(enabled=trim and not for_inference)
         self.for_inference = for_inference
-        self.num_classes_cls = num_classes_cls
         self.use_amp = use_amp
-        self.return_embed = return_embed
 
         embed_dim = embed_dims[-1] if len(embed_dims) > 0 else input_dim
         default_cfg = dict(embed_dim=embed_dim, num_heads=num_heads, ffn_ratio=4,
@@ -549,7 +551,7 @@ class ParticleTransformer(nn.Module):
     def no_weight_decay(self):
         return {'cls_token', }
 
-    def forward(self, x, v=None, mask=None, uu=None, uu_idx=None):
+    def forward(self, x, v=None, mask=None, uu=None, uu_idx=None, return_embed=False):
         # x: (N, C, P)
         # v: (N, 4, P) [px,py,pz,energy]
         # mask: (N, 1, P) -- real particle = 1, padded = 0
@@ -586,14 +588,9 @@ class ParticleTransformer(nn.Module):
                 return x_cls
             output = self.fc(x_cls)
             if self.for_inference:
-                # for onnx export
-                assert self.num_classes_cls is not None
-                output_cls, output_reg = output.split([self.num_classes_cls, output.size(1) - self.num_classes_cls], dim=1)
-                output_cls = torch.softmax(output_cls, dim=1)
-                output = torch.cat([output_cls, output_reg], dim=-1)
-
+                output = torch.softmax(output, dim=1)
             # print('output:\n', output)
-            if self.return_embed == False:
+            if return_embed == False:
                 return output
             else:
                 return output, x_cls
@@ -606,7 +603,7 @@ class ParticleTransformerTagger(nn.Module):
                  sv_input_dim,
                  num_classes=None,
                  # network configurations
-                 pair_input_dim=4,
+                 pair_input_dim=6,
                  pair_extra_dim=0,
                  remove_self_pair=False,
                  use_pre_activation_pair=True,
@@ -623,9 +620,7 @@ class ParticleTransformerTagger(nn.Module):
                  # misc
                  trim=True,
                  for_inference=False,
-                 num_classes_cls=None, # for onnx export
                  use_amp=False,
-                 return_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -657,15 +652,13 @@ class ParticleTransformerTagger(nn.Module):
                                         # misc
                                         trim=False,
                                         for_inference=for_inference,
-                                        num_classes_cls=num_classes_cls, # for onnx export
-                                        use_amp=use_amp,
-                                        return_embed=return_embed)
+                                        use_amp=use_amp)
 
     @torch.jit.ignore
     def no_weight_decay(self):
         return {'part.cls_token', }
 
-    def forward(self, pf_x, pf_v=None, pf_mask=None, sv_x=None, sv_v=None, sv_mask=None):
+    def forward(self, pf_x, pf_v=None, pf_mask=None, sv_x=None, sv_v=None, sv_mask=None, return_embed=False):
         # x: (N, C, P)
         # v: (N, 4, P) [px,py,pz,energy]
         # mask: (N, 1, P) -- real particle = 1, padded = 0
@@ -681,7 +674,7 @@ class ParticleTransformerTagger(nn.Module):
             sv_x = self.sv_embed(sv_x)
             x = torch.cat([pf_x, sv_x], dim=0)
 
-            return self.part(x, v, mask)
+            return self.part(x, v, mask, return_embed=return_embed)
 
 class ParticleTransformerTagger_3coll(nn.Module):
 
@@ -691,7 +684,7 @@ class ParticleTransformerTagger_3coll(nn.Module):
                  sv_input_dim,
                  num_classes=None,
                  # network configurations
-                 pair_input_dim=4,
+                 pair_input_dim=6,
                  pair_extra_dim=0,
                  remove_self_pair=False,
                  use_pre_activation_pair=True,
@@ -708,9 +701,7 @@ class ParticleTransformerTagger_3coll(nn.Module):
                  # misc
                  trim=True,
                  for_inference=False,
-                 num_classes_cls=None, # for onnx export
                  use_amp=False,
-                 return_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -744,15 +735,13 @@ class ParticleTransformerTagger_3coll(nn.Module):
                                         # misc
                                         trim=False,
                                         for_inference=for_inference,
-                                        num_classes_cls=num_classes_cls, # for onnx export
-                                        use_amp=use_amp,
-                                        return_embed=return_embed)
+                                        use_amp=use_amp)
 
     @torch.jit.ignore
     def no_weight_decay(self):
         return {'part.cls_token', }
 
-    def forward(self, cpf_x, cpf_v=None, cpf_mask=None, npf_x=None, npf_v=None, npf_mask=None, sv_x=None, sv_v=None, sv_mask=None):
+    def forward(self, cpf_x, cpf_v=None, cpf_mask=None, npf_x=None, npf_v=None, npf_mask=None, sv_x=None, sv_v=None, sv_mask=None, return_embed=False):
         # x: (N, C, P)
         # v: (N, 4, P) [px,py,pz,energy]
         # mask: (N, 1, P) -- real particle = 1, padded = 0
@@ -770,7 +759,7 @@ class ParticleTransformerTagger_3coll(nn.Module):
             sv_x = self.sv_embed(sv_x)
             x = torch.cat([cpf_x, npf_x, sv_x], dim=0)
 
-            return self.part(x, v, mask)
+            return self.part(x, v, mask, return_embed=return_embed)
 
 
 class ParticleTransformerTaggerWithExtraPairFeatures(nn.Module):
@@ -780,7 +769,7 @@ class ParticleTransformerTaggerWithExtraPairFeatures(nn.Module):
                  sv_input_dim,
                  num_classes=None,
                  # network configurations
-                 pair_input_dim=4,
+                 pair_input_dim=6,
                  pair_extra_dim=0,
                  remove_self_pair=False,
                  use_pre_activation_pair=True,

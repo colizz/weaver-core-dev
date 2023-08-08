@@ -5,12 +5,15 @@ from torch import Tensor
 from weaver.utils.logger import _logger
 from weaver.utils.import_tools import import_module
 
+ParT = import_module(os.path.join(os.path.dirname(__file__), 'ParticleTransformer2023.py'), 'ParT')
+
+
 def get_model(data_config, **kwargs):
 
     cfg = dict(
         # pf_input_dim=len(data_config.input_dicts['pf_features']),
         # sv_input_dim=len(data_config.input_dicts['sv_features']),
-        num_classes=data_config.label_value_cls_num + data_config.label_value_reg_num,
+        num_classes=128, ## manually defined to calculate contrastive loss!
         # network configurations
         pair_input_dim=4,
         pair_extra_dim=0,
@@ -29,15 +32,9 @@ def get_model(data_config, **kwargs):
         # misc
         trim=True,
         for_inference=False,
-        num_classes_cls=data_config.label_value_cls_num, # for onnx export
     )
-    kwargs.pop('loss_gamma')
-    norm_pair = kwargs.pop('norm_pair', False)
-    if not norm_pair:
-        ParT = import_module(os.path.join(os.path.dirname(__file__), 'ParticleTransformer2023.py'), 'ParT')
-    else:
-        ParT = import_module(os.path.join(os.path.dirname(__file__), 'ParticleTransformer2023_normpair.py'), 'ParT')
-        cfg['pair_input_dim'] = 6
+    kwargs.pop('temperature')
+    kwargs.pop('base_temperature')
 
     three_coll = kwargs.pop('three_coll', False)
     if not three_coll:
@@ -68,41 +65,12 @@ def get_model(data_config, **kwargs):
     return model, model_info
 
 
-class LogCoshLoss(torch.nn.L1Loss):
-    __constants__ = ['reduction']
-
-    def __init__(self, reduction: str = 'mean') -> None:
-        super(LogCoshLoss, self).__init__(None, None, reduction)
-
-    def forward(self, input: Tensor, target: Tensor) -> Tensor:
-        x = input - target
-        loss = x + torch.nn.functional.softplus(-2. * x) - math.log(2)
-        if self.reduction == 'none':
-            return loss
-        elif self.reduction == 'mean':
-            return loss.mean(dim=0)
-        elif self.reduction == 'sum':
-            return loss.sum(dim=0)
-
-
-class HybridLoss(torch.nn.L1Loss):
-    __constants__ = ['reduction']
-
-    def __init__(self, reduction: str = 'mean', gamma=1.) -> None:
-        super(HybridLoss, self).__init__(None, None, reduction)
-        self.loss_cls_fn = torch.nn.CrossEntropyLoss()
-        self.loss_reg_fn = LogCoshLoss()
-        self.gamma = gamma
-
-    def forward(self, input_cls: Tensor, input_reg: Tensor, target_cls: Tensor, target_reg: Tensor) -> Tensor:
-        loss_cls = self.loss_cls_fn(input_cls, target_cls)
-        loss_reg = self.loss_reg_fn(input_reg, target_reg)
-        loss = loss_cls + self.gamma * loss_reg.sum()
-        loss_dict = {'cls': loss_cls.item(), 'reg': loss_reg.sum().item()}
-        loss_dict.update({f'reg_{i}': loss_reg[i].item() for i in range(loss_reg.shape[0])})
-        return loss, loss_dict
+SupConLoss = import_module(os.path.join(os.path.dirname(__file__), 'sup_contrast_loss.py'), 'sup_contrast_loss').SupConLoss
 
 
 def get_loss(data_config, **kwargs):
-    gamma = kwargs.get('loss_gamma', 1)
-    return HybridLoss(gamma=gamma)
+    temperature = kwargs.pop('temperature', 0.07)
+    base_temperature = kwargs.pop('base_temperature', 0.07)
+    return SupConLoss(
+        contrast_mode='one', temperature=temperature, base_temperature=base_temperature
+        )

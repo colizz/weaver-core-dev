@@ -1,15 +1,15 @@
-import os
+''' Particle Transformer (ParT)
+Paper: "Particle Transformer for Jet Tagging" - https://arxiv.org/abs/2202.03772
+'''
 import math
-import torch
-import torch.nn as nn
-from torch import Tensor
-from weaver.utils.logger import _logger
-from weaver.utils.import_tools import import_module
-
 import random
 import warnings
 import copy
+import torch
+import torch.nn as nn
 from functools import partial
+
+from weaver.utils.logger import _logger
 
 
 @torch.jit.script
@@ -75,9 +75,11 @@ def p3_norm(p, eps=1e-8):
     return p[:, :3] / p[:, :3].norm(dim=1, keepdim=True).clamp(min=eps)
 
 
-def pairwise_lv_fts(xi, xj, num_outputs=4, eps=1e-8, for_onnx=False):
+def pairwise_lv_fts(xi, xj, xsum, num_outputs=6, eps=1e-8, for_onnx=False):
+    assert num_outputs == 6
     pti, rapi, phii = to_ptrapphim(xi, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
     ptj, rapj, phij = to_ptrapphim(xj, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
+    ptall, *_ = to_ptrapphim(xsum, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
 
     delta = delta_r2(rapi, phii, rapj, phij).sqrt()
     lndelta = torch.log(delta.clamp(min=eps))
@@ -86,33 +88,58 @@ def pairwise_lv_fts(xi, xj, num_outputs=4, eps=1e-8, for_onnx=False):
 
     if num_outputs > 1:
         ptmin = ((pti <= ptj) * pti + (pti > ptj) * ptj) if for_onnx else torch.minimum(pti, ptj)
-        lnkt = torch.log((ptmin * delta).clamp(min=eps))
+        kt = (ptmin * delta).clamp(min=eps)
+        lnkt = torch.log(kt)
+        lnktrel = torch.log(kt / ptall)
         lnz = torch.log((ptmin / (pti + ptj).clamp(min=eps)).clamp(min=eps))
-        outputs = [lnkt, lnz, lndelta]
-
-    if num_outputs > 3:
-        xij = xi + xj
-        lnm2 = torch.log(to_m2(xij, eps=eps))
-        outputs.append(lnm2)
+        outputs = [lnkt, lnktrel + 7.5, lnz, lndelta]
 
     if num_outputs > 4:
-        ei, ej = xi[:, 3:4], xj[:, 3:4]
-        emin = ((ei <= ej) * ei + (ei > ej) * ej) if for_onnx else torch.minimum(ei, ej)
-        lnet = torch.log((emin * delta).clamp(min=eps))
-        lnze = torch.log((emin / (ei + ej).clamp(min=eps)).clamp(min=eps))
-        outputs += [lnet, lnze]
+        xij = xi + xj
+        mij2 = to_m2(xij, eps=eps)
+        lnm2 = torch.log(mij2)
+        lnm2rel = torch.log(mij2 / to_m2(xsum, eps=eps))
+        outputs.extend([lnm2, lnm2rel + 10.])
 
     if num_outputs > 6:
-        costheta = (p3_norm(xi, eps=eps) * p3_norm(xj, eps=eps)).sum(dim=1, keepdim=True)
-        sintheta = (1 - costheta**2).clamp(min=0, max=1).sqrt()
-        outputs += [costheta, sintheta]
+        lnds2 = torch.log(torch.clamp(-to_m2(xi - xj, eps=None), min=eps))
+        outputs.append(lnds2)
 
-    assert(len(outputs) == num_outputs)
+    # the following features are not symmetric for (i, j)
+    if num_outputs > 7:
+        xj_boost = boost(xj, xij)
+        costheta = (p3_norm(xj_boost, eps=eps) * p3_norm(xij, eps=eps)).sum(dim=1, keepdim=True)
+        outputs.append(costheta)
+
+    if num_outputs > 8:
+        deltarap = rapi - rapj
+        deltaphi = delta_phi(phii, phij)
+        outputs += [deltarap, deltaphi]
+
+    assert (len(outputs) == num_outputs)
+
     return torch.cat(outputs, dim=1)
 
 
+def build_sparse_tensor(uu, idx, seq_len):
+    # inputs: uu (N, C, num_pairs), idx (N, 2, num_pairs)
+    # return: (N, C, seq_len, seq_len)
+    batch_size, num_fts, num_pairs = uu.size()
+    idx = torch.min(idx, torch.ones_like(idx) * seq_len)
+    i = torch.cat((
+        torch.arange(0, batch_size, device=uu.device).repeat_interleave(num_fts * num_pairs).unsqueeze(0),
+        torch.arange(0, num_fts, device=uu.device).repeat_interleave(num_pairs).repeat(batch_size).unsqueeze(0),
+        idx[:, :1, :].expand_as(uu).flatten().unsqueeze(0),
+        idx[:, 1:, :].expand_as(uu).flatten().unsqueeze(0),
+    ), dim=0)
+    return torch.sparse_coo_tensor(
+        i, uu.flatten(),
+        size=(batch_size, num_fts, seq_len + 1, seq_len + 1),
+        device=uu.device).to_dense()[:, :, :seq_len, :seq_len]
+
+
 def trunc_normal_(tensor, mean=0., std=1., a=-2., b=2.):
-    # From https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/layers/weight_init.py
+    # From https://github.com/rwightman/pytorch-image-models/blob/18ec173f95aa220af753358bf860b16b6691edb2/timm/layers/weight_init.py#L8
     r"""Fills the input Tensor with values drawn from a truncated
     normal distribution. The values are effectively drawn from the
     normal distribution :math:`\mathcal{N}(\text{mean}, \text{std}^2)`
@@ -170,28 +197,34 @@ class SequenceTrimmer(nn.Module):
         self.target = target
         self._counter = 0
 
-    def forward(self, x, v=None, mask=None):
+    def forward(self, x, v=None, mask=None, uu=None):
         # x: (N, C, P)
         # v: (N, 4, P) [px,py,pz,energy]
         # mask: (N, 1, P) -- real particle = 1, padded = 0
-        if self.enabled:
-            if mask is None:
-                mask = torch.ones_like(x[:, :1])
-            mask = mask.bool()
+        # uu: (N, C', P, P)
+        if mask is None:
+            mask = torch.ones_like(x[:, :1])
+        mask = mask.bool()
 
+        if self.enabled:
             if self._counter < 5:
                 self._counter += 1
             else:
                 if self.training:
-                    q = min(1, random.uniform(*self.target))
+                    # q = min(1, random.uniform(*self.target))
+                    # maxlen = torch.quantile(mask.type_as(x).sum(dim=-1), q).long()
+                    q = torch.min(torch.ones(1, device=mask.device), torch.rand(1, device=mask.device) * (self.target[1] - self.target[0]) + self.target[0])[0]
                     maxlen = torch.quantile(mask.type_as(x).sum(dim=-1), q).long()
                     rand = torch.rand_like(mask.type_as(x))
                     rand.masked_fill_(~mask, -1)
-                    perm = rand.argsort(dim=-1, descending=True)
+                    perm = rand.argsort(dim=-1, descending=True)  # (N, 1, P)
                     mask = torch.gather(mask, -1, perm)
                     x = torch.gather(x, -1, perm.expand_as(x))
                     if v is not None:
                         v = torch.gather(v, -1, perm.expand_as(v))
+                    if uu is not None:
+                        uu = torch.gather(uu, -2, perm.unsqueeze(-1).expand_as(uu))
+                        uu = torch.gather(uu, -1, perm.unsqueeze(-2).expand_as(uu))
                 else:
                     maxlen = mask.sum(dim=-1).max()
                 maxlen = max(maxlen, 1)
@@ -200,8 +233,10 @@ class SequenceTrimmer(nn.Module):
                     x = x[:, :, :maxlen]
                     if v is not None:
                         v = v[:, :, :maxlen]
+                    if uu is not None:
+                        uu = uu[:, :, :maxlen, :maxlen]
 
-        return x, v, mask
+        return x, v, mask, uu
 
 
 class Embed(nn.Module):
@@ -229,44 +264,121 @@ class Embed(nn.Module):
 
 
 class PairEmbed(nn.Module):
-    def __init__(self, input_dim, dims, normalize_input=True, activation='gelu', eps=1e-8, for_onnx=False):
+    def __init__(
+            self, pairwise_lv_dim, pairwise_input_dim, dims,
+            remove_self_pair=False, use_pre_activation_pair=True, mode='sum',
+            normalize_input=True, activation='gelu', eps=1e-8,
+            for_onnx=False):
         super().__init__()
 
+        self.pairwise_lv_dim = pairwise_lv_dim
+        self.pairwise_input_dim = pairwise_input_dim
+        self.is_symmetric = True
+        self.remove_self_pair = remove_self_pair
+        self.mode = mode
         self.for_onnx = for_onnx
-        self.pairwise_lv_fts = partial(pairwise_lv_fts, num_outputs=input_dim, eps=eps, for_onnx=for_onnx)
-
-        module_list = [nn.BatchNorm1d(input_dim)] if normalize_input else []
-        for dim in dims:
-            module_list.extend([
-                nn.Conv1d(input_dim, dim, 1),
-                nn.BatchNorm1d(dim),
-                nn.GELU() if activation == 'gelu' else nn.ReLU(),
-            ])
-            input_dim = dim
-        self.embed = nn.Sequential(*module_list)
-
+        self.pairwise_lv_fts = partial(pairwise_lv_fts, num_outputs=pairwise_lv_dim, eps=eps, for_onnx=for_onnx)
         self.out_dim = dims[-1]
 
-    def forward(self, x):
-        # x: (batch, v_dim, seq_len)
-        with torch.no_grad():
-            batch_size, _, seq_len = x.size()
-            if not self.for_onnx:
-                i, j = torch.tril_indices(seq_len, seq_len, device=x.device)
-                x = x.unsqueeze(-1).repeat(1, 1, 1, seq_len)
-                xi = x[:, :, i, j]  # (batch, dim, seq_len*(seq_len+1)/2)
-                xj = x[:, :, j, i]
-                x = self.pairwise_lv_fts(xi, xj)
-            else:
-                x = self.pairwise_lv_fts(x.unsqueeze(-1), x.unsqueeze(-2)).view(batch_size, -1, seq_len * seq_len)
+        if self.mode == 'concat':
+            input_dim = pairwise_lv_dim + pairwise_input_dim
+            module_list = [nn.BatchNorm1d(input_dim)] if normalize_input else []
+            for dim in dims:
+                module_list.extend([
+                    nn.Conv1d(input_dim, dim, 1),
+                    nn.BatchNorm1d(dim),
+                    nn.GELU() if activation == 'gelu' else nn.ReLU(),
+                ])
+                input_dim = dim
+            if use_pre_activation_pair:
+                module_list = module_list[:-1]
+            self.embed = nn.Sequential(*module_list)
+        elif self.mode == 'sum':
+            if pairwise_lv_dim > 0:
+                input_dim = pairwise_lv_dim
+                module_list = [nn.BatchNorm1d(input_dim)] if normalize_input else []
+                for dim in dims:
+                    module_list.extend([
+                        nn.Conv1d(input_dim, dim, 1),
+                        nn.BatchNorm1d(dim),
+                        nn.GELU() if activation == 'gelu' else nn.ReLU(),
+                    ])
+                    input_dim = dim
+                if use_pre_activation_pair:
+                    module_list = module_list[:-1]
+                self.embed = nn.Sequential(*module_list)
 
-        elements = self.embed(x)  # (batch, embed_dim, num_elements)
-        if not self.for_onnx:
-            y = torch.zeros(batch_size, self.out_dim, seq_len, seq_len, dtype=elements.dtype, device=x.device)
+            if pairwise_input_dim > 0:
+                input_dim = pairwise_input_dim
+                module_list = [nn.BatchNorm1d(input_dim)] if normalize_input else []
+                for dim in dims:
+                    module_list.extend([
+                        nn.Conv1d(input_dim, dim, 1),
+                        nn.BatchNorm1d(dim),
+                        nn.GELU() if activation == 'gelu' else nn.ReLU(),
+                    ])
+                    input_dim = dim
+                if use_pre_activation_pair:
+                    module_list = module_list[:-1]
+                self.fts_embed = nn.Sequential(*module_list)
+        else:
+            raise RuntimeError('`mode` can only be `sum` or `concat`')
+
+    def forward(self, x, uu=None):
+        # x: (batch, v_dim, seq_len)
+        # uu: (batch, v_dim, seq_len, seq_len)
+        assert (x is not None or uu is not None)
+        with torch.no_grad():
+            if x is not None:
+                batch_size, _, seq_len = x.size()
+            else:
+                batch_size, _, seq_len, _ = uu.size()
+            if self.is_symmetric and not self.for_onnx:
+                i, j = torch.tril_indices(seq_len, seq_len, offset=-1 if self.remove_self_pair else 0,
+                                          device=(x if x is not None else uu).device)
+                if x is not None:
+                    xsum = x.sum(dim=-1, keepdims=True)
+                    x = x.unsqueeze(-1).repeat(1, 1, 1, seq_len)
+                    xi = x[:, :, i, j]  # (batch, dim, seq_len*(seq_len+1)/2)
+                    xj = x[:, :, j, i]
+                    x = self.pairwise_lv_fts(xi, xj, xsum)
+                if uu is not None:
+                    # (batch, dim, seq_len*(seq_len+1)/2)
+                    uu = uu[:, :, i, j]
+            else:
+                if x is not None:
+                    xsum = x.sum(dim=-1, keepdims=True)
+                    x = self.pairwise_lv_fts(x.unsqueeze(-1), x.unsqueeze(-2), xsum)
+                    if self.remove_self_pair:
+                        i = torch.arange(0, seq_len, device=x.device)
+                        x[:, :, i, i] = 0
+                    x = x.view(-1, self.pairwise_lv_dim, seq_len * seq_len)
+                if uu is not None:
+                    uu = uu.view(-1, self.pairwise_input_dim, seq_len * seq_len)
+            if self.mode == 'concat':
+                if x is None:
+                    pair_fts = uu
+                elif uu is None:
+                    pair_fts = x
+                else:
+                    pair_fts = torch.cat((x, uu), dim=1)
+
+        if self.mode == 'concat':
+            elements = self.embed(pair_fts)  # (batch, embed_dim, num_elements)
+        elif self.mode == 'sum':
+            if x is None:
+                elements = self.fts_embed(uu)
+            elif uu is None:
+                elements = self.embed(x)
+            else:
+                elements = self.embed(x) + self.fts_embed(uu)
+
+        if self.is_symmetric and not self.for_onnx:
+            y = torch.zeros(batch_size, self.out_dim, seq_len, seq_len, dtype=elements.dtype, device=elements.device)
             y[:, :, i, j] = elements
             y[:, :, j, i] = elements
         else:
-            y = elements.view(batch_size, -1, seq_len, seq_len)
+            y = elements.view(-1, self.out_dim, seq_len, seq_len)
         return y
 
 
@@ -274,7 +386,7 @@ class Block(nn.Module):
     def __init__(self, embed_dim=128, num_heads=8, ffn_ratio=4,
                  dropout=0.1, attn_dropout=0.1, activation_dropout=0.1,
                  add_bias_kv=False, activation='gelu',
-                 scale_fc=True, scale_attn=True, scale_heads=True, scale_resids=True):
+                 scale_fc=True, scale_attn=True, scale_heads=True, scale_resids=True, enable_mem_efficient=False):
         super().__init__()
 
         self.embed_dim = embed_dim
@@ -283,7 +395,15 @@ class Block(nn.Module):
         self.ffn_dim = embed_dim * ffn_ratio
 
         self.pre_attn_norm = nn.LayerNorm(embed_dim)
-        self.attn = nn.MultiheadAttention(
+
+        self.enable_mem_efficient = enable_mem_efficient
+        if enable_mem_efficient:
+            from weaver.utils.import_tools import import_module
+            import os
+            MultiheadAttention = import_module(os.path.join(os.path.dirname(__file__), 'memory_efficient_attention.py'), 'memory_efficient_attention').MemoryEfficientMultiheadAttention
+        else:
+            MultiheadAttention = nn.MultiheadAttention
+        self.attn = MultiheadAttention(
             embed_dim,
             num_heads,
             dropout=attn_dropout,
@@ -310,11 +430,12 @@ class Block(nn.Module):
             padding_mask (ByteTensor, optional): binary
                 ByteTensor of shape `(batch, seq_len)` where padding
                 elements are indicated by ``1``.
-
         Returns:
             encoded output of shape `(seq_len, batch, embed_dim)`
         """
 
+        if not self.enable_mem_efficient:
+            padding_mask = torch.zeros_like(padding_mask, dtype=x.dtype).masked_fill(padding_mask, float('-inf'))
         if x_cls is not None:
             with torch.no_grad():
                 # prepend one element for x_cls: -> (batch, 1+seq_len)
@@ -323,19 +444,19 @@ class Block(nn.Module):
             residual = x_cls
             u = torch.cat((x_cls, x), dim=0)  # (seq_len+1, batch, embed_dim)
             u = self.pre_attn_norm(u)
-            x = self.attn(x_cls, u, u, key_padding_mask=padding_mask)[0]  # (1, batch, embed_dim)
+            x = self.attn(x_cls, u, u, key_padding_mask=padding_mask, need_weights=False)[0]  # (1, batch, embed_dim)
         else:
             residual = x
             x = self.pre_attn_norm(x)
             x = self.attn(x, x, x, key_padding_mask=padding_mask,
-                          attn_mask=attn_mask)[0]  # (seq_len, batch, embed_dim)
+                          attn_mask=attn_mask, need_weights=False)[0]  # (seq_len, batch, embed_dim)
 
         if self.c_attn is not None:
-            tgt_len, bsz = x.size(0), x.size(1)
-            x = x.view(tgt_len, bsz, self.num_heads, self.head_dim)
+            tgt_len = x.size(0)
+            x = x.view(tgt_len, -1, self.num_heads, self.head_dim)
             # x = torch.einsum('tbhd,h->tbdh', x, self.c_attn)
-             v
-            x = x.reshape(tgt_len, bsz, self.embed_dim)
+            x = x.permute(0, 1, 3, 2) * self.c_attn.reshape(1, 1, 1, -1)  # rewrite einsum
+            x = x.reshape(tgt_len, -1, self.embed_dim)
         if self.post_attn_norm is not None:
             x = self.post_attn_norm(x)
         x = self.dropout(x)
@@ -362,7 +483,10 @@ class ParticleTransformer(nn.Module):
                  input_dim,
                  num_classes=None,
                  # network configurations
-                 pair_input_dim=4,
+                 pair_input_dim=6,
+                 pair_extra_dim=0,
+                 remove_self_pair=False,
+                 use_pre_activation_pair=True,
                  embed_dims=[128, 512, 128],
                  pair_embed_dims=[64, 64, 64],
                  num_heads=8,
@@ -372,22 +496,28 @@ class ParticleTransformer(nn.Module):
                  cls_block_params={'dropout': 0, 'attn_dropout': 0, 'activation_dropout': 0},
                  fc_params=[],
                  activation='gelu',
+                 enable_mem_efficient=False,
                  # misc
                  trim=True,
                  for_inference=False,
+                 num_classes_cls=None, # for onnx export
                  use_amp=False,
+                 return_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
         self.trimmer = SequenceTrimmer(enabled=trim and not for_inference)
         self.for_inference = for_inference
+        self.num_classes_cls = num_classes_cls
         self.use_amp = use_amp
+        self.return_embed = return_embed
 
         embed_dim = embed_dims[-1] if len(embed_dims) > 0 else input_dim
         default_cfg = dict(embed_dim=embed_dim, num_heads=num_heads, ffn_ratio=4,
                            dropout=0.1, attn_dropout=0.1, activation_dropout=0.1,
                            add_bias_kv=False, activation=activation,
-                           scale_fc=True, scale_attn=True, scale_heads=True, scale_resids=True)
+                           scale_fc=True, scale_attn=True, scale_heads=True, scale_resids=True,
+                           enable_mem_efficient=enable_mem_efficient)
 
         cfg_block = copy.deepcopy(default_cfg)
         if block_params is not None:
@@ -399,10 +529,12 @@ class ParticleTransformer(nn.Module):
             cfg_cls_block.update(cls_block_params)
         _logger.info('cfg_cls_block: %s' % str(cfg_cls_block))
 
+        self.pair_extra_dim = pair_extra_dim
         self.embed = Embed(input_dim, embed_dims, activation=activation) if len(embed_dims) > 0 else nn.Identity()
         self.pair_embed = PairEmbed(
-            pair_input_dim, pair_embed_dims + [cfg_block['num_heads']],
-            for_onnx=for_inference) if pair_embed_dims is not None and pair_input_dim > 0 else None
+            pair_input_dim, pair_extra_dim, pair_embed_dims + [cfg_block['num_heads']],
+            remove_self_pair=remove_self_pair, use_pre_activation_pair=use_pre_activation_pair,
+            for_onnx=for_inference) if pair_embed_dims is not None and pair_input_dim + pair_extra_dim > 0 else None
         self.blocks = nn.ModuleList([Block(**cfg_block) for _ in range(num_layers)])
         self.cls_blocks = nn.ModuleList([Block(**cfg_cls_block) for _ in range(num_cls_layers)])
         self.norm = nn.LayerNorm(embed_dim)
@@ -426,22 +558,26 @@ class ParticleTransformer(nn.Module):
     def no_weight_decay(self):
         return {'cls_token', }
 
-    def forward(self, x, v=None, mask=None):
+    def forward(self, x, v=None, mask=None, uu=None, uu_idx=None):
         # x: (N, C, P)
         # v: (N, 4, P) [px,py,pz,energy]
         # mask: (N, 1, P) -- real particle = 1, padded = 0
+        # for pytorch: uu (N, C', num_pairs), uu_idx (N, 2, num_pairs)
+        # for onnx: uu (N, C', P, P), uu_idx=None
 
-        mask = mask.bool()
         with torch.no_grad():
-            x, v, mask = self.trimmer(x, v, mask)
+            if not self.for_inference:
+                if uu_idx is not None:
+                    uu = build_sparse_tensor(uu, uu_idx, x.size(-1))
+            x, v, mask, uu = self.trimmer(x, v, mask, uu)
             padding_mask = ~mask.squeeze(1)  # (N, P)
 
         with torch.cuda.amp.autocast(enabled=self.use_amp):
             # input embedding
             x = self.embed(x).masked_fill(~mask.permute(2, 0, 1), 0)  # (P, N, C)
             attn_mask = None
-            if v is not None and self.pair_embed is not None:
-                attn_mask = self.pair_embed(v).view(-1, v.size(-1), v.size(-1))  # (N*num_heads, P, P)
+            if (v is not None or uu is not None) and self.pair_embed is not None:
+                attn_mask = self.pair_embed(v, uu).view(-1, v.size(-1), v.size(-1))  # (N*num_heads, P, P)
 
             # transform
             for block in self.blocks:
@@ -458,25 +594,32 @@ class ParticleTransformer(nn.Module):
             if self.fc is None:
                 return x_cls
             output = self.fc(x_cls)
-            
-            # for inference: expose the hidden neurons
             if self.for_inference:
-                output_cls, output_reg = output.split([output.size(1) - 1, 1], dim=1)
+                # for onnx export
+                assert self.num_classes_cls is not None
+                output_cls, output_reg = output.split([self.num_classes_cls, output.size(1) - self.num_classes_cls], dim=1)
                 output_cls = torch.softmax(output_cls, dim=1)
+                output = torch.cat([output_cls, output_reg], dim=-1)
 
-                output = torch.cat([output_cls, output_reg, x_cls], dim=-1)
             # print('output:\n', output)
-            return output
+            if self.return_embed == False:
+                return output
+            else:
+                return output, x_cls
 
 
-class ParticleTransformerTagger(nn.Module):
+class ParticleTransformerTagger_3coll(nn.Module):
 
     def __init__(self,
-                 pf_input_dim,
+                 cpf_input_dim,
+                 npf_input_dim,
                  sv_input_dim,
                  num_classes=None,
                  # network configurations
-                 pair_input_dim=4,
+                 pair_input_dim=6,
+                 pair_extra_dim=0,
+                 remove_self_pair=False,
+                 use_pre_activation_pair=True,
                  embed_dims=[128, 512, 128],
                  pair_embed_dims=[64, 64, 64],
                  num_heads=8,
@@ -486,25 +629,33 @@ class ParticleTransformerTagger(nn.Module):
                  cls_block_params={'dropout': 0, 'attn_dropout': 0, 'activation_dropout': 0},
                  fc_params=[],
                  activation='gelu',
+                 enable_mem_efficient=False,
                  # misc
                  trim=True,
                  for_inference=False,
+                 num_classes_cls=None, # for onnx export
                  use_amp=False,
+                 return_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
         self.use_amp = use_amp
 
-        self.pf_trimmer = SequenceTrimmer(enabled=trim and not for_inference)
+        self.cpf_trimmer = SequenceTrimmer(enabled=trim and not for_inference)
+        self.npf_trimmer = SequenceTrimmer(enabled=trim and not for_inference)
         self.sv_trimmer = SequenceTrimmer(enabled=trim and not for_inference)
 
-        self.pf_embed = Embed(pf_input_dim, embed_dims, activation=activation)
-        self.sv_embed = Embed(sv_input_dim, embed_dims, activation=activation)
+        self.cpf_embed = Embed(cpf_input_dim + 2, embed_dims, activation=activation)
+        self.npf_embed = Embed(npf_input_dim + 2, embed_dims, activation=activation)
+        self.sv_embed = Embed(sv_input_dim + 2, embed_dims, activation=activation)
 
         self.part = ParticleTransformer(input_dim=embed_dims[-1],
                                         num_classes=num_classes,
                                         # network configurations
                                         pair_input_dim=pair_input_dim,
+                                        pair_extra_dim=pair_extra_dim,
+                                        remove_self_pair=remove_self_pair,
+                                        use_pre_activation_pair=use_pre_activation_pair,
                                         embed_dims=[],
                                         pair_embed_dims=pair_embed_dims,
                                         num_heads=num_heads,
@@ -514,104 +665,40 @@ class ParticleTransformerTagger(nn.Module):
                                         cls_block_params=cls_block_params,
                                         fc_params=fc_params,
                                         activation=activation,
+                                        enable_mem_efficient=enable_mem_efficient,
                                         # misc
                                         trim=False,
                                         for_inference=for_inference,
-                                        use_amp=use_amp)
+                                        num_classes_cls=num_classes_cls, # for onnx export
+                                        use_amp=use_amp,
+                                        return_embed=return_embed)
 
     @torch.jit.ignore
     def no_weight_decay(self):
         return {'part.cls_token', }
 
-    def forward(self, pf_x, pf_v=None, pf_mask=None, sv_x=None, sv_v=None, sv_mask=None):
+    def forward(self, cpf_x, cpf_v=None, cpf_mask=None, npf_x=None, npf_v=None, npf_mask=None, sv_x=None, sv_v=None, sv_mask=None):
         # x: (N, C, P)
         # v: (N, 4, P) [px,py,pz,energy]
         # mask: (N, 1, P) -- real particle = 1, padded = 0
 
         with torch.no_grad():
-            pf_x, pf_v, pf_mask = self.pf_trimmer(pf_x, pf_v, pf_mask)
-            sv_x, sv_v, sv_mask = self.sv_trimmer(sv_x, sv_v, sv_mask)
-            v = torch.cat([pf_v, sv_v], dim=2)
-            mask = torch.cat([pf_mask, sv_mask], dim=2)
+            cpf_x, cpf_v, cpf_mask, _ = self.cpf_trimmer(cpf_x, cpf_v, cpf_mask)
+            npf_x, npf_v, npf_mask, _ = self.npf_trimmer(npf_x, npf_v, npf_mask)
+            sv_x, sv_v, sv_mask, _ = self.sv_trimmer(sv_x, sv_v, sv_mask)
+            v = torch.cat([cpf_v, npf_v, sv_v], dim=2)
+            mask = torch.cat([cpf_mask, npf_mask, sv_mask], dim=2)
+
+            # calculate ptrel and erel
+            ptrel, erel = {}, {}
+            for n, vn in [('cpf', cpf_v), ('npf', npf_v), ('sv', sv_v)]:
+                ptrel[n] = - torch.log(to_pt2(vn) / to_pt2(vn.sum(dim=-1, keepdim=True))) * 0.25
+                erel[n] = - torch.log(vn[:, 3:4] / vn[:, 3:4].sum(dim=-1, keepdim=True)) * 0.5
 
         with torch.cuda.amp.autocast(enabled=self.use_amp):
-            pf_x = self.pf_embed(pf_x)  # after embed: (seq_len, batch, embed_dim)
-            sv_x = self.sv_embed(sv_x)
-            x = torch.cat([pf_x, sv_x], dim=0)
+            cpf_x = self.cpf_embed(torch.cat([cpf_x, ptrel['cpf'], erel['cpf']], dim=1))  # after embed: (seq_len, batch, embed_dim)
+            npf_x = self.npf_embed(torch.cat([npf_x, ptrel['npf'], erel['npf']], dim=1))  # after embed: (seq_len, batch, embed_dim)
+            sv_x = self.sv_embed(torch.cat([sv_x, ptrel['sv'], erel['sv']], dim=1))  # after embed: (seq_len, batch, embed_dim)
+            x = torch.cat([cpf_x, npf_x, sv_x], dim=0)
 
             return self.part(x, v, mask)
-
-
-def get_model(data_config, **kwargs):
-
-    cfg = dict(
-        pf_input_dim=len(data_config.input_dicts['pf_features']),
-        sv_input_dim=len(data_config.input_dicts['sv_features']),
-        num_classes=len(data_config.label_value) + 1, # one dim for regression
-        # network configurations
-        pair_input_dim=4,
-        embed_dims=[128, 512, 128],
-        pair_embed_dims=[64, 64, 64],
-        num_heads=8,
-        num_layers=8,
-        num_cls_layers=2,
-        block_params=None,
-        cls_block_params={'dropout': 0, 'attn_dropout': 0, 'activation_dropout': 0},
-        fc_params=[],
-        activation='gelu',
-        # misc
-        trim=True,
-        for_inference=False,
-    )
-    kwargs.pop('loss_gamma')
-    cfg.update(**kwargs)
-    _logger.info('Model config: %s' % str(cfg))
-
-    model = ParticleTransformerTagger(**cfg)
-
-    model_info = {
-        'input_names': list(data_config.input_names),
-        'input_shapes': {k: ((1,) + s[1:]) for k, s in data_config.input_shapes.items()},
-        'output_names': ['softmax'],
-        'dynamic_axes': {**{k: {0: 'N', 2: 'n_' + k.split('_')[0]} for k in data_config.input_names}, **{'softmax': {0: 'N'}}},
-    }
-
-    return model, model_info
-
-
-class LogCoshLoss(torch.nn.L1Loss):
-    __constants__ = ['reduction']
-
-    def __init__(self, reduction: str = 'mean') -> None:
-        super(LogCoshLoss, self).__init__(None, None, reduction)
-
-    def forward(self, input: Tensor, target: Tensor) -> Tensor:
-        x = input - target
-        loss = x + torch.nn.functional.softplus(-2. * x) - math.log(2)
-        if self.reduction == 'none':
-            return loss
-        elif self.reduction == 'mean':
-            return loss.mean()
-        elif self.reduction == 'sum':
-            return loss.sum()
-
-
-class HybridLoss(torch.nn.L1Loss):
-    __constants__ = ['reduction']
-
-    def __init__(self, reduction: str = 'mean', gamma=1.) -> None:
-        super(HybridLoss, self).__init__(None, None, reduction)
-        self.loss_cls_fn = torch.nn.CrossEntropyLoss()
-        self.loss_reg_fn = LogCoshLoss()
-        self.gamma = gamma
-
-    def forward(self, input_cls: Tensor, input_reg: Tensor, target_cls: Tensor, target_reg: Tensor) -> Tensor:
-        loss_cls = self.loss_cls_fn(input_cls, target_cls)
-        loss_reg = self.loss_reg_fn(input_reg, target_reg)
-        loss = loss_cls + self.gamma * loss_reg
-        return loss, {'cls': loss_cls.item(), 'reg': loss_reg.item()}
-
-
-def get_loss(data_config, **kwargs):
-    gamma = kwargs.get('loss_gamma', 1)
-    return HybridLoss(gamma=gamma)

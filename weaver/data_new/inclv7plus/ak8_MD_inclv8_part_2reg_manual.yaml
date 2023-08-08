@@ -12,7 +12,7 @@ selection: >-
 # starting from v8: we have dedicated QCD and ttbar dataset for test only - they compose of 1/7 full events.
 # for QCD: just use 1/2 of events
 test_time_selection: >-
-    (jet_tightId==1) & (jet_no<2) & (fj_pt>200) & (fj_pt<2500) & (fj_sdmass>=20) & (fj_sdmass<260) &
+    (jet_tightId==1) & (jet_no<2) &
     (
       ((sample_isQCD==1) & (event_no%2==0)) |
       (sample_isQCD==0)

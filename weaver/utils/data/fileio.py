@@ -247,7 +247,7 @@ def _read_root(filepath, branches, load_range=None, treename=None):
     _branches = remove_branch(_branches, filepath)
 
     import uproot
-    with uproot.open(filepath) as f:
+    with uproot.open(filepath, object_cache=None, array_cache=None) as f:
         if treename is None:
             treenames = set([k.split(';')[0] for k, v in f.items() if getattr(v, 'classname', '') == 'TTree'])
             if len(treenames) == 1:

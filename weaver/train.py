@@ -326,7 +326,7 @@ def onnx(args, model, data_config, model_info):
                       input_names=model_info['input_names'],
                       output_names=model_info['output_names'],
                       dynamic_axes=model_info.get('dynamic_axes', None),
-                      opset_version=11)
+                      opset_version=11) # 11 for 10_6, 14 for Run 3
     _logger.info('ONNX model saved to %s', args.export_onnx)
 
     preprocessing_json = os.path.join(os.path.dirname(args.export_onnx), 'preprocess.json')
@@ -702,7 +702,8 @@ def _main(args):
         dev = torch.device('cpu')
     
     # torch configs
-    torch.set_float32_matmul_precision('high')
+    if torch.__version__.startswith('2.'):
+        torch.set_float32_matmul_precision('high')
 
     # load data
     if training_mode:

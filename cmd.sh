@@ -836,7 +836,7 @@ $DATAPATH'/20221023_ak8_UL17_v6/GluGluToH1JetToWW_HEFT_MH-15to250_JHUVariableWMa
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
 --predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root \
 --log $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train_{auto}.log --tensorboard _${PREFIX}_{auto}
-
+''
 # infer ttbar samples
 NGPUS=1
 GPU=0

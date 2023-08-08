@@ -137,6 +137,12 @@ new_variables:
     cpfcandlt_btagSip3dVal_sort: cpfcandlt_btagSip3dVal[cpfcandlt_index]
     cpfcandlt_btagSip3dSig_sort: cpfcandlt_btagSip3dSig[cpfcandlt_index]
     cpfcandlt_btagJetDistVal_sort: cpfcandlt_btagJetDistVal[cpfcandlt_index]
+    cpfcandlt_pixelBarrelLayersWithMeasurement_sort: cpfcandlt_pixelBarrelLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_pixelEndcapLayersWithMeasurement_sort: cpfcandlt_pixelEndcapLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_stripTECLayersWithMeasurement_sort: cpfcandlt_stripTECLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_stripTIBLayersWithMeasurement_sort: cpfcandlt_stripTIBLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_stripTIDLayersWithMeasurement_sort: cpfcandlt_stripTIDLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_stripTOBLayersWithMeasurement_sort: cpfcandlt_stripTOBLayersWithMeasurement[cpfcandlt_index]
     cpfcandlt_px_sort: cpfcandlt_px[cpfcandlt_index]
     cpfcandlt_py_sort: cpfcandlt_py[cpfcandlt_index]
     cpfcandlt_pz_sort: cpfcandlt_pz[cpfcandlt_index]
@@ -188,6 +194,12 @@ inputs:
             - [cpfcandlt_btagSip3dVal_sort, 0, 100]
             - [cpfcandlt_btagSip3dSig_sort, 0, 0.5]
             - [cpfcandlt_btagJetDistVal_sort, 0, 40]
+            - [cpfcandlt_pixelBarrelLayersWithMeasurement_sort, 0, 0.1]
+            - [cpfcandlt_pixelEndcapLayersWithMeasurement_sort, 0, 0.1]
+            - [cpfcandlt_stripTECLayersWithMeasurement_sort, 0, 0.1]
+            - [cpfcandlt_stripTIBLayersWithMeasurement_sort, 0, 0.1]
+            - [cpfcandlt_stripTIDLayersWithMeasurement_sort, 0, 0.1]
+            - [cpfcandlt_stripTOBLayersWithMeasurement_sort, 0, 0.1]
     cpf_vectors:
         length: 90
         pad_mode: wrap

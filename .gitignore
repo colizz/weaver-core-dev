@@ -4,6 +4,8 @@ logs
 model
 predict
 runs
+*.root
+weaver-custom
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
