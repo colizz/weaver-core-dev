@@ -11,6 +11,7 @@ selection: >-
 ### selection to apply at test time (i.e., when running w/ --predict)
 # starting from v8: we have dedicated QCD and ttbar dataset for test only - they compose of 1/7 full events.
 # for QCD: just use 1/2 of events
+##!! for topvsQCD, note that the inference Ztt sample already have event_no%7=0 in dnntuple level
 test_time_selection: >-
     (jet_tightId==1) & (jet_no<2) &
     (
@@ -290,322 +291,80 @@ observers:
     - fj_genjet_sdmass
     - fj_genjet_nomu_sdmass
     - sample_isQCD
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWcsc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWcscs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWcsev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWcsmv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWcsq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWcsqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWcss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWcstauev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWcstauhv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWcstaumv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWqqc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWqqev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWqqmv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWqqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWqqs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWqqtauev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWqqtauhv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWWqqtaumv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarcsc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarcscs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarcsev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarcsmv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarcsq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarcsqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarcss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarcstauev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarcstauhv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarcstaumv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarqqc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarqqev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarqqmv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarqqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarqqs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarqqtauev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarqqtauhv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxStarqqtaumv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxcsc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxcscs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxcsev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxcsmv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxcsq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxcsqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxcss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxcstauev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxcstauhv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxcstaumv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxqqc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxqqev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxqqmv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxqqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxqqs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxqqtauev
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxqqtauhv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHWxWxqqtaumv
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbbb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbcc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbe
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbbtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZbtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZccb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZccc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZcccc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZcce
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZccee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZccm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZccmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZccq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZccqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZccs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZccss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZcctauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZcctauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZcctauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZcee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZcmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZctauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZctauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZctauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqe
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqqtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZqtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZsee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZsmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZssb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZssc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZsse
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZssee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZssm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZssmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZssq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZssqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZsss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZssss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZsstauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZsstauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZsstauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZstauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZstauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZZstauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbbb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbcc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbe
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbbtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarbtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarccb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarccc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarcccc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarcce
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarccee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarccm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarccmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarccq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarccqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarccs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarccss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarcctauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarcctauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarcctauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarcee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarcmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarctauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarctauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarctauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqe
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqqtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarqtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarsee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarsmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarssb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarssc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarsse
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarssee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarssm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarssmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarssq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarssqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarsss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarssss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarsstauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarsstauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarsstauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarstauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarstauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxStarstauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbbb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbcc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbe
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbbtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxbtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxccb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxccc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxcccc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxcce
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxccee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxccm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxccmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxccq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxccqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxccs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxccss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxcctauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxcctauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxcctauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxcee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxcmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxctauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxctauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxctauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqe
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqs
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqqtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqtauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqtauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxqtauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxsee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxsmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxssb
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxssc
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxsse
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxssee
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxssm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxssmm
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxssq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxssqq
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxsss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxssss
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxsstauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxsstauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxsstauhtaum
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxstauhtaue
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxstauhtauh
-    # - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHZxZxstauhtaum
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHbb
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHbc
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHbs
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHcc
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHcs
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHee
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHgg
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHmm
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHqq
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHss
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHtauhtaue
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHtauhtauh
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probHtauhtaum
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probQCDb
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probQCDbb
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probQCDc
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probQCDcc
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probQCDothers
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopWcs
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopWev
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopWmv
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopWqq
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopWtauev
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopWtauhv
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopWtaumv
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopbWc
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopbWcs
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopbWev
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopbWmv
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopbWq
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopbWqq
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopbWs
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopbWtauev
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopbWtauhv
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_probTopbWtaumv
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_resonanceMassCorr
-    - pfMassDecorrelatedInclParticleTransformerV2JetTags_visiableMassCorr
+    - pfParticleNetMassRegressionJetTags_mass
+    - pfMassDecorrelatedParticleNetJetTags_probXbb
+    - pfMassDecorrelatedParticleNetJetTags_probXcc
+    - pfMassDecorrelatedParticleNetJetTags_probXqq
+    - pfMassDecorrelatedParticleNetJetTags_probQCDb
+    - pfMassDecorrelatedParticleNetJetTags_probQCDbb
+    - pfMassDecorrelatedParticleNetJetTags_probQCDc
+    - pfMassDecorrelatedParticleNetJetTags_probQCDcc
+    - pfMassDecorrelatedParticleNetJetTags_probQCDothers
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_mass
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWev0c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWev1c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWmv0c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWmv1c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWq0c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWq1c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWq2c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWqq0c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWqq1c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWqq2c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtauev0c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtauev1c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtauhv0c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtauhv1c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtaumv0c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHWqqWtaumv1c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHbb
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHcc
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHqq
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHss
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHtauhtaue
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHtauhtauh
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probHtauhtaum
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probQCDb
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probQCDbb
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probQCDc
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probQCDcc
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probQCDothers
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWev
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWmv
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWq0c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWq1c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWqq0c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWqq1c
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWtauev
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWtauhv
+    - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWtaumv
+    - pfParticleNetDiscriminatorsJetTags_H4qvsQCD
+    - pfParticleNetDiscriminatorsJetTags_HbbvsQCD
+    - pfParticleNetDiscriminatorsJetTags_HccvsQCD
+    - pfParticleNetDiscriminatorsJetTags_TvsQCD
+    - pfParticleNetDiscriminatorsJetTags_WvsQCD
+    - pfParticleNetDiscriminatorsJetTags_ZbbvsQCD
+    - pfParticleNetDiscriminatorsJetTags_ZvsQCD
+    - pfParticleNetJetTags_probHbb
+    - pfParticleNetJetTags_probHcc
+    - pfParticleNetJetTags_probHqqqq
+    - pfParticleNetJetTags_probQCDb
+    - pfParticleNetJetTags_probQCDbb
+    - pfParticleNetJetTags_probQCDc
+    - pfParticleNetJetTags_probQCDcc
+    - pfParticleNetJetTags_probQCDothers
+    - pfParticleNetJetTags_probTbc
+    - pfParticleNetJetTags_probTbcq
+    - pfParticleNetJetTags_probTbel
+    - pfParticleNetJetTags_probTbmu
+    - pfParticleNetJetTags_probTbq
+    - pfParticleNetJetTags_probTbqq
+    - pfParticleNetJetTags_probTbta
+    - pfParticleNetJetTags_probWcq
+    - pfParticleNetJetTags_probWqq
+    - pfParticleNetJetTags_probZbb
+    - pfParticleNetJetTags_probZcc
+    - pfParticleNetJetTags_probZqq
 
 weights:
   use_precomputed_weights: false

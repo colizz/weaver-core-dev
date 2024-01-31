@@ -1,0 +1,81 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `ak` in the expression
+
+##!! special setting for gghww regression: only use truth H->WW jets (special ttbar sample also assigned H->WW class (dev-UL-hww-v9-topww branch)
+selection: >-
+    (jet_tightId==1) & (jet_no<2) & (fj_pt>200) &
+    (
+      ((fj_label >= 39) & (fj_label < 49)) & (event_no%7!=0)
+    )
+### selection to apply at test time (i.e., when running w/ --predict)
+# starting from v8: we have dedicated QCD and ttbar dataset for test only - they compose of 1/7 full events.
+# for QCD: just use 1/2 of events
+##!! special for gghww: let's only veto QCD jets from the H->WW/ttbar inferred events
+test_time_selection: >-
+    (jet_tightId==1) & (jet_no<2) & (fj_pt>200) &
+    (
+      ~((fj_label >= 309) & (fj_label < 314)) & (event_no%7==0)
+    )
+new_variables:
+    ### [format] name: formula
+    ### can use functions from `math`, `np` (numpy), and `ak` in the expression
+    zeros: ak.zeros_like(fj_pt)
+    fj_p4: _p4_from_ptetaphim(fj_pt, fj_eta, fj_phi, fj_mass)
+    fj_t_p4: _p4_from_ptetaphim(fj_pt, zeros, fj_phi, fj_mass)
+    fj_pt_log: np.log(fj_pt + 1e-20)
+    fj_e_log: np.log(fj_p4.energy + 1e-20)
+    met_t_p4: _p4_from_ptetaphie(met_pt, zeros, met_phi, met_pt)
+    met_pt_log: np.log(met_pt + 1e-20)
+    met_sumEt_log: np.log(met_sumEt + 1e-20)
+    met_significance_log: np.log(met_significance + 1e-20)
+    met_fj_ptrel: met_pt / fj_pt
+    met_fj_dphi: (met_phi - fj_phi + np.pi) % (2 * np.pi) - np.pi
+    met_fj_mt_log: np.log((met_t_p4 + fj_t_p4).mass + 1e-20)
+    met_fj_mass_log: np.log((met_t_p4 + fj_p4).mass + 1e-20)
+
+preprocess:
+    ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+    method: manual
+    ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+    data_fraction:
+
+inputs:
+    ft_vars:
+        length: 256
+        pad_mode: constant
+        vars:
+            - [jet_custom_discs, null]
+    aux_vars:
+        length: null
+        vars:
+            - [met_pt_log, 4., 1.]
+            - [met_sumEt_log, 8., 3.]
+            - [met_significance_log, 2., 0.5]
+            - [fj_pt_log, 5.29832, 1.5]
+            - [fj_e_log, 5.29832, 1.5]
+            - fj_eta
+            - met_fj_ptrel
+            - met_fj_dphi
+            - [met_fj_mt_log, 5., 2.]
+            - [met_fj_mass_log, 5., 2.]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: custom
+    value:
+        target_mass: fj_gen_mass
+
+observers:
+    - event_no
+    - fj_label
+    - fj_pt
+    - fj_eta
+    - fj_phi
+    - fj_mass
+    - fj_sdmass
+    - fj_sdmass_fromsubjets
+    - fj_gen_mass
+    - fj_genparts_mass
+    - fj_genjet_sdmass
+    - fj_genjet_nomu_sdmass
+    - sample_isQCD

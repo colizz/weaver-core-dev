@@ -1,0 +1,53 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `ak` in the expression
+
+## Note: hww has fake fj_isQCD=1.. However in below selection we do not select label_H_wwunmatch in training pool
+selection: >-
+    ((fj_sdmass > 100) & (fj_sdmass < 140))
+
+### selection to apply at test time (i.e., when running w/ --predict)
+# starting from v8: we have dedicated QCD and ttbar dataset for test only - they compose of 1/7 full events.
+# for QCD: just use 1/2 of events
+test_time_selection: >-
+    ((fj_sdmass > 100) & (fj_sdmass < 140))
+
+new_variables:
+    ### [format] name: formula
+    ### can use functions from `math`, `np` (numpy), and `ak` in the expression
+    # classes for reweighting
+    label_window: ((fj_sdmass > 110) & (fj_sdmass < 130))
+    label_sideband: ~label_window
+    jet_custom_discs_new: >-
+        ak.where(((fj_sdmass > 100) & (fj_sdmass < 110)), jet_custom_discs_5,
+        ak.where(((fj_sdmass > 110) & (fj_sdmass < 120)), jet_custom_discs_4,
+        ak.where(((fj_sdmass > 120) & (fj_sdmass < 130)), jet_custom_discs_3, 
+        ak.where(((fj_sdmass > 130) & (fj_sdmass < 140)), jet_custom_discs_2, jet_custom_discs))))
+
+preprocess:
+    ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+    method: manual
+    ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+    data_fraction:
+
+inputs:
+    ft_vars:
+        length: 256
+        pad_mode: constant
+        vars:
+            - [jet_custom_discs_new, null]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: simple
+    value: [label_window, label_sideband]
+
+observers:
+    - event_no
+    - fj_label
+    - fj_mass
+    - fj_sdmass
+    - jet_pt
+    - jet_eta
+    - jet_phi
+    - sample_isQCD
+    - pfMassDecorrelatedParticleNetDiscriminatorsJetTags_XbbvsQCD

@@ -3,7 +3,7 @@
 logs
 model
 predict
-runs
+runs*
 *.root
 weaver-custom
 

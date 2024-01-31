@@ -114,6 +114,10 @@ class DataConfig(object):
             self.label_names.extend(list(self.label_value_custom.keys()))
             self.var_funcs.update(self.label_value_custom)
             self.label_value_reg_num = len(self.label_value_custom)
+            self.split_per_cls = opts['labels'].get('split_per_cls', False)
+            if self.split_per_cls:
+                self.label_value_reg_num *= self.label_value_cls_num
+
         self.label_names = tuple(self.label_names)
         self.basewgt_name = '_basewgt_'
         self.weight_name = None

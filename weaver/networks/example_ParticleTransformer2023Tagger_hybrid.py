@@ -32,6 +32,7 @@ def get_model(data_config, **kwargs):
         num_classes_cls=data_config.label_value_cls_num, # for onnx export
     )
     kwargs.pop('loss_gamma')
+    kwargs.pop('loss_split_reg')
     norm_pair = kwargs.pop('norm_pair', False)
     if not norm_pair:
         ParT = import_module(os.path.join(os.path.dirname(__file__), 'ParticleTransformer2023.py'), 'ParT')
@@ -71,12 +72,27 @@ def get_model(data_config, **kwargs):
 class LogCoshLoss(torch.nn.L1Loss):
     __constants__ = ['reduction']
 
-    def __init__(self, reduction: str = 'mean') -> None:
+    def __init__(self, reduction='mean', split_reg=False):
         super(LogCoshLoss, self).__init__(None, None, reduction)
+        self.split_reg = split_reg
 
-    def forward(self, input: Tensor, target: Tensor) -> Tensor:
-        x = input - target
-        loss = x + torch.nn.functional.softplus(-2. * x) - math.log(2)
+    def forward(self, input, target_reg, target_cls=None, n_cls=None):
+
+        if not self.split_reg:
+            x = input - target_reg # dim: (B, n_reg)
+            loss = x + torch.nn.functional.softplus(-2. * x) - math.log(2)
+        
+        else:
+            # calculate regression loss for each class separately
+            # input: (N, C * n_reg), target_reg: (N, n_reg), target_cls: (N)
+            n_reg = target_reg.shape[1]
+            input = input.view(-1, n_cls, n_reg)
+            target_reg = target_reg.view(-1, 1, n_reg)
+            target_cls = torch.nn.functional.one_hot(target_cls, num_classes=n_cls).bool().view(-1, n_cls, 1)
+            x = input - target_reg # dim: (B, n_cls, n_reg)
+            loss = x + torch.nn.functional.softplus(-2. * x) - math.log(2)
+            loss = (loss * target_cls).sum(dim=1) # dim: (B, n_reg)
+        
         if self.reduction == 'none':
             return loss
         elif self.reduction == 'mean':
@@ -85,18 +101,18 @@ class LogCoshLoss(torch.nn.L1Loss):
             return loss.sum(dim=0)
 
 
-class HybridLoss(torch.nn.L1Loss):
-    __constants__ = ['reduction']
+class HybridLoss(torch.nn.Module):
 
-    def __init__(self, reduction: str = 'mean', gamma=1.) -> None:
-        super(HybridLoss, self).__init__(None, None, reduction)
+    def __init__(self, reduction='mean', split_reg=False, gamma=1.):
+        super(HybridLoss, self).__init__()
         self.loss_cls_fn = torch.nn.CrossEntropyLoss()
-        self.loss_reg_fn = LogCoshLoss()
+        self.loss_reg_fn = LogCoshLoss(reduction=reduction, split_reg=split_reg)
         self.gamma = gamma
 
-    def forward(self, input_cls: Tensor, input_reg: Tensor, target_cls: Tensor, target_reg: Tensor) -> Tensor:
+    def forward(self, input_cls, input_reg, target_cls, target_reg):
+
         loss_cls = self.loss_cls_fn(input_cls, target_cls)
-        loss_reg = self.loss_reg_fn(input_reg, target_reg)
+        loss_reg = self.loss_reg_fn(input_reg, target_reg, target_cls=target_cls, n_cls=input_cls.shape[1])
         loss = loss_cls + self.gamma * loss_reg.sum()
         loss_dict = {'cls': loss_cls.item(), 'reg': loss_reg.sum().item()}
         loss_dict.update({f'reg_{i}': loss_reg[i].item() for i in range(loss_reg.shape[0])})
@@ -105,4 +121,5 @@ class HybridLoss(torch.nn.L1Loss):
 
 def get_loss(data_config, **kwargs):
     gamma = kwargs.get('loss_gamma', 1)
-    return HybridLoss(gamma=gamma)
+    split_reg = kwargs.get('loss_split_reg', True)
+    return HybridLoss(split_reg=split_reg, gamma=gamma)

@@ -184,7 +184,10 @@ class _SimpleIter(object):
                      (self._name, str(self.load_range), json.dumps(self.worker_file_dict, indent=2)))
 
         # reset file fetching cursor
-        self.ipos = 0 if self._fetch_by_files else self.load_range[0]
+        if self._start_pos is not None:
+            self.ipos = self._start_pos
+        else:
+            self.ipos = 0 if self._fetch_by_files else self.load_range[0]
         # prefetch the first entry asynchronously
         self._try_get_next(init=True)
 
@@ -247,7 +250,7 @@ class _SimpleIter(object):
             filelist = self.filelist
             load_range = (self.ipos, min(self.ipos + self._fetch_step, self.load_range[1]))
 
-        # _logger.info('Start fetching next batch, len(filelist)=%d, load_range=%s'%(len(filelist), load_range))
+        _logger.info('Start fetching next batch, len(filelist)=%d, load_range=%s'%(len(filelist), load_range))
         if self._async_load:
             if hasattr(self, 'executor'):
                 self.executor.shutdown(wait=False)
@@ -295,7 +298,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
     """
 
     def __init__(self, file_dict, data_config_file, for_training=True, load_range_and_fraction=None,
-                 fetch_by_files=False, fetch_step=0.01, file_fraction=1, remake_weights=False, up_sample=True,
+                 fetch_by_files=False, fetch_step=0.01, file_fraction=1, start_pos=None, remake_weights=False, up_sample=True,
                  weight_scale=1, max_resample=10, async_load=True, infinity_mode=False, in_memory=False, name=''):
         self._iters = {} if infinity_mode or in_memory else None
         _init_args = set(self.__dict__.keys())
@@ -304,6 +307,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         self._fetch_by_files = fetch_by_files
         self._fetch_step = fetch_step
         self._file_fraction = file_fraction
+        self._start_pos = start_pos
         self._async_load = async_load
         self._infinity_mode = infinity_mode
         self._in_memory = in_memory
@@ -372,3 +376,21 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
                 kwargs = {k: copy.deepcopy(self.__dict__[k]) for k in self._init_args}
                 self._iters[worker_id] = _SimpleIter(**kwargs)
                 return self._iters[worker_id]
+
+    # def restart_at_curr_pos(self):
+    #     ## was found not helpful
+    #     if isinstance(self._iters, dict):
+    #         start_pos = {}
+    #         worker_ids = list(self._iters.keys())
+    #         for k in worker_ids:
+    #             start_pos[k] = self._iters[k].ipos + self._fetch_step
+    #             del self._iters[k]
+    #         # restart
+    #         for k in worker_ids:
+    #             _logger.info('Restart iter %s at %s' % (k, start_pos))
+    #             kwargs = {k: copy.deepcopy(self.__dict__[k]) for k in self._init_args}
+    #             kwargs['_start_pos'] = start_pos[k]
+    #             self._iters[k] = _SimpleIter(**kwargs)
+    #     else:
+    #         # no restarting in in-memory mode
+    #         pass

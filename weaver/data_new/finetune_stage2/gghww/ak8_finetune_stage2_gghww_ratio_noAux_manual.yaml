@@ -1,0 +1,57 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `ak` in the expression
+
+##!! special setting for gghww regression: only use truth H->WW jets (special ttbar sample also assigned H->WW class (dev-UL-hww-v9-topww branch)
+selection: >-
+    (jet_tightId==1) & (jet_no<2) & (fj_pt>200) &
+    (
+      ((fj_label >= 39) & (fj_label < 49)) & (event_no%7!=0)
+    )
+### selection to apply at test time (i.e., when running w/ --predict)
+# starting from v8: we have dedicated QCD and ttbar dataset for test only - they compose of 1/7 full events.
+# for QCD: just use 1/2 of events
+##!! special for gghww: let's only veto QCD jets from the H->WW/ttbar inferred events
+##!!! added in 23.11.16: we now use "gghwwsm" sample for inference. Use all events
+test_time_selection: >-
+    (jet_tightId==1) & (jet_no<2) & (fj_pt>200) &
+    (
+      ~((fj_label >= 309) & (fj_label < 314))
+    )
+new_variables:
+    ### [format] name: formula
+    ### can use functions from `math`, `np` (numpy), and `ak` in the expression
+    zeros: ak.zeros_like(fj_pt)
+
+preprocess:
+    ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+    method: manual
+    ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+    data_fraction:
+
+inputs:
+    ft_vars:
+        length: 256
+        pad_mode: constant
+        vars:
+            - [jet_custom_discs, null]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: custom
+    value:
+        target_mass: fj_gen_mass / fj_mass
+
+observers:
+    - event_no
+    - fj_label
+    - fj_pt
+    - fj_eta
+    - fj_phi
+    - fj_mass
+    - fj_sdmass
+    - fj_sdmass_fromsubjets
+    - fj_gen_mass
+    - fj_genparts_mass
+    - fj_genjet_sdmass
+    - fj_genjet_nomu_sdmass
+    - sample_isQCD

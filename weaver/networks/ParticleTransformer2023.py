@@ -445,8 +445,8 @@ class Block(nn.Module):
         if self.c_attn is not None:
             tgt_len = x.size(0)
             x = x.view(tgt_len, -1, self.num_heads, self.head_dim)
-            # x = torch.einsum('tbhd,h->tbdh', x, self.c_attn)
-            x = x.permute(0, 1, 3, 2) * self.c_attn.reshape(1, 1, 1, -1)  # rewrite einsum
+            x = torch.einsum('tbhd,h->tbdh', x, self.c_attn)
+            # x = x.permute(0, 1, 3, 2) * self.c_attn.reshape(1, 1, 1, -1)  # rewrite einsum
             x = x.reshape(tgt_len, -1, self.embed_dim)
         if self.post_attn_norm is not None:
             x = self.post_attn_norm(x)
@@ -494,6 +494,7 @@ class ParticleTransformer(nn.Module):
                  num_classes_cls=None, # for onnx export
                  use_amp=False,
                  return_embed=False,
+                 export_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -502,6 +503,7 @@ class ParticleTransformer(nn.Module):
         self.num_classes_cls = num_classes_cls
         self.use_amp = use_amp
         self.return_embed = return_embed
+        self.export_embed = export_embed
 
         embed_dim = embed_dims[-1] if len(embed_dims) > 0 else input_dim
         default_cfg = dict(embed_dim=embed_dim, num_heads=num_heads, ffn_ratio=4,
@@ -593,6 +595,9 @@ class ParticleTransformer(nn.Module):
                 output = torch.cat([output_cls, output_reg], dim=-1)
 
             # print('output:\n', output)
+            if self.export_embed:
+                return torch.cat([output, x_cls], dim=-1)
+
             if self.return_embed == False:
                 return output
             else:
@@ -626,6 +631,7 @@ class ParticleTransformerTagger(nn.Module):
                  num_classes_cls=None, # for onnx export
                  use_amp=False,
                  return_embed=False,
+                 export_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -659,7 +665,8 @@ class ParticleTransformerTagger(nn.Module):
                                         for_inference=for_inference,
                                         num_classes_cls=num_classes_cls, # for onnx export
                                         use_amp=use_amp,
-                                        return_embed=return_embed)
+                                        return_embed=return_embed,
+                                        export_embed=export_embed)
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -711,6 +718,7 @@ class ParticleTransformerTagger_3coll(nn.Module):
                  num_classes_cls=None, # for onnx export
                  use_amp=False,
                  return_embed=False,
+                 export_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -746,7 +754,8 @@ class ParticleTransformerTagger_3coll(nn.Module):
                                         for_inference=for_inference,
                                         num_classes_cls=num_classes_cls, # for onnx export
                                         use_amp=use_amp,
-                                        return_embed=return_embed)
+                                        return_embed=return_embed,
+                                        export_embed=export_embed)
 
     @torch.jit.ignore
     def no_weight_decay(self):

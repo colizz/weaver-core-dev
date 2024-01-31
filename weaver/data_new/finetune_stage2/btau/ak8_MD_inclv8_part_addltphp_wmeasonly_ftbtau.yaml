@@ -1,0 +1,336 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `ak` in the expression
+
+## Note: hww has fake fj_isQCD=1.. However in below selection we do not select label_H_wwunmatch in training pool
+selection: >-
+    (jet_tightId==1) & (jet_no<2) & (fj_pt>200) & (fj_pt<2500) & (fj_sdmass>=20) & (fj_sdmass<260) &
+    (
+      ((fj_label >= 309) & (fj_label < 314) & (sample_isQCD==1) & (event_no%7!=0)) |
+      (~((fj_label >= 309) & (fj_label < 314)) & (sample_isQCD==0))
+    )
+### selection to apply at test time (i.e., when running w/ --predict)
+# starting from v8: we have dedicated QCD and ttbar dataset for test only - they compose of 1/7 full events.
+# for QCD: just use 1/2 of events
+test_time_selection: >-
+    (jet_tightId==1) & (jet_no<2) &
+    (
+      ((sample_isQCD==1) & (event_no%2==0)) |
+      ((fj_label < 309) & (fj_label < 314) & (sample_isQCD==0)) | 
+      ((fj_label >= 314) & (sample_isQCD==0) & (event_no%7==0))
+    )
+new_variables:
+    ### [format] name: formula
+    ### can use functions from `math`, `np` (numpy), and `ak` in the expression
+    # classes for reweighting
+    label_Top_bWQQ: ((fj_label >= 0) & (fj_label < 2))
+    label_Top_bWQ: ((fj_label >= 2) & (fj_label < 5))
+    label_Top_bWev: (fj_label == 5)
+    label_Top_bWmv: (fj_label == 6)
+    label_Top_bWtauev: (fj_label == 7)
+    label_Top_bWtaumv: (fj_label == 8)
+    label_Top_bWtauhv: (fj_label == 9)
+    label_Top_WQQ: ((fj_label >= 10) & (fj_label < 12))
+    label_Top_Wev: (fj_label == 12)
+    label_Top_Wmv: (fj_label == 13)
+    label_Top_Wtauev: (fj_label == 14)
+    label_Top_Wtaumv: (fj_label == 15)
+    label_Top_Wtauhv: (fj_label == 16)
+    label_H_bb: (fj_label == 17)
+    label_H_cc: (fj_label == 18)
+    label_H_ss: (fj_label == 19)
+    label_H_qq: (fj_label == 20)
+    label_H_bc: (fj_label == 21)
+    label_H_bs: (fj_label == 22)
+    label_H_cs: (fj_label == 23)
+    label_H_gg: (fj_label == 24)
+    label_H_ee: (fj_label == 25)
+    label_H_mm: (fj_label == 26)
+    label_H_tauhtaue: (fj_label == 27)
+    label_H_tauhtaum: (fj_label == 28)
+    label_H_tauhtauh: (fj_label == 29)
+    label_H_WW_QQQQ: ((fj_label >= 30) & (fj_label < 33))
+    label_H_WW_QQQ: ((fj_label >= 33) & (fj_label < 39))
+    label_H_WW_QQev: ((fj_label >= 39) & (fj_label < 41))
+    label_H_WW_QQmv: ((fj_label >= 41) & (fj_label < 43))
+    label_H_WW_QQtauev: ((fj_label >= 43) & (fj_label < 45))
+    label_H_WW_QQtaumv: ((fj_label >= 45) & (fj_label < 47))
+    label_H_WW_QQtauhv: ((fj_label >= 47) & (fj_label < 49))
+    label_H_WxWx_QQQQ: ((fj_label >= 49) & (fj_label < 52))
+    label_H_WxWx_QQQ: ((fj_label >= 52) & (fj_label < 58))
+    label_H_WxWx_QQev: ((fj_label >= 58) & (fj_label < 60))
+    label_H_WxWx_QQmv: ((fj_label >= 60) & (fj_label < 62))
+    label_H_WxWx_QQtauev: ((fj_label >= 62) & (fj_label < 64))
+    label_H_WxWx_QQtaumv: ((fj_label >= 64) & (fj_label < 66))
+    label_H_WxWx_QQtauhv: ((fj_label >= 66) & (fj_label < 68))
+    label_H_WxWxStar_QQQQ: ((fj_label >= 68) & (fj_label < 71))
+    label_H_WxWxStar_QQQ: ((fj_label >= 71) & (fj_label < 77))
+    label_H_WxWxStar_QQev: ((fj_label >= 77) & (fj_label < 79))
+    label_H_WxWxStar_QQmv: ((fj_label >= 79) & (fj_label < 81))
+    label_H_WxWxStar_QQtauev: ((fj_label >= 81) & (fj_label < 83))
+    label_H_WxWxStar_QQtaumv: ((fj_label >= 83) & (fj_label < 85))
+    label_H_WxWxStar_QQtauhv: ((fj_label >= 85) & (fj_label < 87))
+    label_H_ZZ_QQQQ: ((fj_label >= 87) & (fj_label < 97))
+    label_H_ZZ_QQQ: ((fj_label >= 97) & (fj_label < 113))
+    label_H_ZZ_QQee: ((fj_label == 113) | (fj_label == 125) | (fj_label == 137) | (fj_label == 149))
+    label_H_ZZ_QQmm: ((fj_label == 114) | (fj_label == 126) | (fj_label == 138) | (fj_label == 150))
+    label_H_ZZ_QQe: ((fj_label == 115) | (fj_label == 127) | (fj_label == 139) | (fj_label == 151))
+    label_H_ZZ_QQm: ((fj_label == 116) | (fj_label == 128) | (fj_label == 140) | (fj_label == 152))
+    label_H_ZZ_Qee: ((fj_label == 117) | (fj_label == 129) | (fj_label == 141) | (fj_label == 153))
+    label_H_ZZ_Qmm: ((fj_label == 118) | (fj_label == 130) | (fj_label == 142) | (fj_label == 154))
+    label_H_ZZ_QQtauhtaue: ((fj_label == 119) | (fj_label == 131) | (fj_label == 143) | (fj_label == 155))
+    label_H_ZZ_QQtauhtaum: ((fj_label == 120) | (fj_label == 132) | (fj_label == 144) | (fj_label == 156))
+    label_H_ZZ_QQtauhtauh: ((fj_label == 121) | (fj_label == 133) | (fj_label == 145) | (fj_label == 157))
+    label_H_ZZ_Qtauhtaue: ((fj_label == 122) | (fj_label == 134) | (fj_label == 146) | (fj_label == 158))
+    label_H_ZZ_Qtauhtaum: ((fj_label == 123) | (fj_label == 135) | (fj_label == 147) | (fj_label == 159))
+    label_H_ZZ_Qtauhtauh: ((fj_label == 124) | (fj_label == 136) | (fj_label == 148) | (fj_label == 160))
+    label_H_ZxZx_QQQQ: ((fj_label >= 161) & (fj_label < 171))
+    label_H_ZxZx_QQQ: ((fj_label >= 171) & (fj_label < 187))
+    label_H_ZxZx_QQee: ((fj_label == 187) | (fj_label == 199) | (fj_label == 211) | (fj_label == 223))
+    label_H_ZxZx_QQmm: ((fj_label == 188) | (fj_label == 200) | (fj_label == 212) | (fj_label == 224))
+    label_H_ZxZx_QQe: ((fj_label == 189) | (fj_label == 201) | (fj_label == 213) | (fj_label == 225))
+    label_H_ZxZx_QQm: ((fj_label == 190) | (fj_label == 202) | (fj_label == 214) | (fj_label == 226))
+    label_H_ZxZx_Qee: ((fj_label == 191) | (fj_label == 203) | (fj_label == 215) | (fj_label == 227))
+    label_H_ZxZx_Qmm: ((fj_label == 192) | (fj_label == 204) | (fj_label == 216) | (fj_label == 228))
+    label_H_ZxZx_QQtauhtaue: ((fj_label == 193) | (fj_label == 205) | (fj_label == 217) | (fj_label == 229))
+    label_H_ZxZx_QQtauhtaum: ((fj_label == 194) | (fj_label == 206) | (fj_label == 218) | (fj_label == 230))
+    label_H_ZxZx_QQtauhtauh: ((fj_label == 195) | (fj_label == 207) | (fj_label == 219) | (fj_label == 231))
+    label_H_ZxZx_Qtauhtaue: ((fj_label == 196) | (fj_label == 208) | (fj_label == 220) | (fj_label == 232))
+    label_H_ZxZx_Qtauhtaum: ((fj_label == 197) | (fj_label == 209) | (fj_label == 221) | (fj_label == 233))
+    label_H_ZxZx_Qtauhtauh: ((fj_label == 198) | (fj_label == 210) | (fj_label == 222) | (fj_label == 234))
+    label_H_ZxZxStar_QQQQ: ((fj_label >= 235) & (fj_label < 245))
+    label_H_ZxZxStar_QQQ: ((fj_label >= 245) & (fj_label < 261))
+    label_H_ZxZxStar_QQee: ((fj_label == 261) | (fj_label == 273) | (fj_label == 285) | (fj_label == 297))
+    label_H_ZxZxStar_QQmm: ((fj_label == 262) | (fj_label == 274) | (fj_label == 286) | (fj_label == 298))
+    label_H_ZxZxStar_QQe: ((fj_label == 263) | (fj_label == 275) | (fj_label == 287) | (fj_label == 299))
+    label_H_ZxZxStar_QQm: ((fj_label == 264) | (fj_label == 276) | (fj_label == 288) | (fj_label == 300))
+    label_H_ZxZxStar_Qee: ((fj_label == 265) | (fj_label == 277) | (fj_label == 289) | (fj_label == 301))
+    label_H_ZxZxStar_Qmm: ((fj_label == 266) | (fj_label == 278) | (fj_label == 290) | (fj_label == 302))
+    label_H_ZxZxStar_QQtauhtaue: ((fj_label == 267) | (fj_label == 279) | (fj_label == 291) | (fj_label == 303))
+    label_H_ZxZxStar_QQtauhtaum: ((fj_label == 268) | (fj_label == 280) | (fj_label == 292) | (fj_label == 304))
+    label_H_ZxZxStar_QQtauhtauh: ((fj_label == 269) | (fj_label == 281) | (fj_label == 293) | (fj_label == 305))
+    label_H_ZxZxStar_Qtauhtaue: ((fj_label == 270) | (fj_label == 282) | (fj_label == 294) | (fj_label == 306))
+    label_H_ZxZxStar_Qtauhtaum: ((fj_label == 271) | (fj_label == 283) | (fj_label == 295) | (fj_label == 307))
+    label_H_ZxZxStar_Qtauhtauh: ((fj_label == 272) | (fj_label == 284) | (fj_label == 296) | (fj_label == 308))
+    label_QCD: (fj_label >= 309) & (fj_label < 314)
+    label_Cust_btaue: (fj_label == 314)
+    label_Cust_btaum: (fj_label == 315)
+    label_Cust_btauh: (fj_label == 316)
+    # ordered by pt
+    cpfcandlt_index: ak.argsort(cpfcandlt_pt_nopuppi, axis=-1, ascending=False)
+    cpfcandlt_pt_log_nopuppi_sort: cpfcandlt_pt_log_nopuppi[cpfcandlt_index]
+    cpfcandlt_e_log_nopuppi_sort: cpfcandlt_e_log_nopuppi[cpfcandlt_index]
+    cpfcandlt_etarel_sort: cpfcandlt_etarel[cpfcandlt_index]
+    cpfcandlt_phirel_sort: cpfcandlt_phirel[cpfcandlt_index]
+    cpfcandlt_abseta_sort: cpfcandlt_abseta[cpfcandlt_index]
+    cpfcandlt_charge_sort: cpfcandlt_charge[cpfcandlt_index]
+    cpfcandlt_isEl_sort: cpfcandlt_isEl[cpfcandlt_index]
+    cpfcandlt_isMu_sort: cpfcandlt_isMu[cpfcandlt_index]
+    cpfcandlt_isChargedHad_sort: cpfcandlt_isChargedHad[cpfcandlt_index]
+    cpfcandlt_isLostTrack_sort: cpfcandlt_isLostTrack[cpfcandlt_index]
+    cpfcandlt_VTX_ass_sort: cpfcandlt_VTX_ass[cpfcandlt_index]
+    cpfcandlt_lostInnerHits_sort: cpfcandlt_lostInnerHits[cpfcandlt_index]
+    cpfcandlt_normchi2_sort: cpfcandlt_normchi2[cpfcandlt_index]
+    cpfcandlt_quality_sort: cpfcandlt_quality[cpfcandlt_index]
+    cpfcandlt_dz_sort: cpfcandlt_dz[cpfcandlt_index]
+    cpfcandlt_dzsig_sort: cpfcandlt_dzsig[cpfcandlt_index]
+    cpfcandlt_dxy_sort: cpfcandlt_dxy[cpfcandlt_index]
+    cpfcandlt_dxysig_sort: cpfcandlt_dxysig[cpfcandlt_index]
+    cpfcandlt_btagEtaRel_sort: cpfcandlt_btagEtaRel[cpfcandlt_index]
+    cpfcandlt_btagPtRatio_sort: cpfcandlt_btagPtRatio[cpfcandlt_index]
+    cpfcandlt_btagPParRatio_sort: cpfcandlt_btagPParRatio[cpfcandlt_index]
+    cpfcandlt_btagSip3dVal_sort: cpfcandlt_btagSip3dVal[cpfcandlt_index]
+    cpfcandlt_btagSip3dSig_sort: cpfcandlt_btagSip3dSig[cpfcandlt_index]
+    cpfcandlt_btagJetDistVal_sort: cpfcandlt_btagJetDistVal[cpfcandlt_index]
+    cpfcandlt_pixelBarrelLayersWithMeasurement_sort: cpfcandlt_pixelBarrelLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_pixelEndcapLayersWithMeasurement_sort: cpfcandlt_pixelEndcapLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_stripTECLayersWithMeasurement_sort: cpfcandlt_stripTECLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_stripTIBLayersWithMeasurement_sort: cpfcandlt_stripTIBLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_stripTIDLayersWithMeasurement_sort: cpfcandlt_stripTIDLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_stripTOBLayersWithMeasurement_sort: cpfcandlt_stripTOBLayersWithMeasurement[cpfcandlt_index]
+    cpfcandlt_px_sort: cpfcandlt_px[cpfcandlt_index]
+    cpfcandlt_py_sort: cpfcandlt_py[cpfcandlt_index]
+    cpfcandlt_pz_sort: cpfcandlt_pz[cpfcandlt_index]
+    cpfcandlt_energy_sort: cpfcandlt_energy[cpfcandlt_index]
+    # masks
+    cpfcandlt_mask: ak.ones_like(cpfcandlt_etarel)
+    npfcand_mask: ak.ones_like(npfcand_etarel)
+    sv_mask: ak.ones_like(sv_etarel)
+
+preprocess:
+    ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+    method: manual
+    ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+    data_fraction:
+
+inputs:
+    cpf_features:
+        length: 90
+        pad_mode: wrap
+        vars:
+            ### [format 1]: var_name (no transformation)
+            ### [format 2]: [var_name,
+            ###              subtract_by(optional, default=None, no transf. if preprocess.method=manual, auto transf. if preprocess.method=auto),
+            ###              multiply_by(optional, default=1),
+            ###              clip_min(optional, default=-5),
+            ###              clip_max(optional, default=5),
+            ###              pad_value(optional, default=0)]
+            - [cpfcandlt_pt_log_nopuppi_sort, 1, 0.5]
+            - [cpfcandlt_e_log_nopuppi_sort, 1.3, 0.5]
+            - cpfcandlt_etarel_sort
+            - cpfcandlt_phirel_sort
+            - [cpfcandlt_abseta_sort, 0.6, 1.6]
+            - cpfcandlt_charge_sort
+            - cpfcandlt_isEl_sort
+            - cpfcandlt_isMu_sort
+            - cpfcandlt_isChargedHad_sort
+            - cpfcandlt_isLostTrack_sort
+            - [cpfcandlt_VTX_ass_sort, 4, 0.3]
+            - cpfcandlt_lostInnerHits_sort
+            - [cpfcandlt_normchi2_sort, 5, 0.2]
+            - [cpfcandlt_quality_sort, 0, 0.2]
+            - [cpfcandlt_dz_sort, 0, 180]
+            - [cpfcandlt_dzsig_sort, 0, 0.9]
+            - [cpfcandlt_dxy_sort, 0.0, 300]
+            - [cpfcandlt_dxysig_sort, 0, 1.0]
+            - [cpfcandlt_btagEtaRel_sort, 1.5, 0.5]
+            - [cpfcandlt_btagPtRatio_sort, 0, 1]
+            - [cpfcandlt_btagPParRatio_sort, 0, 1]
+            - [cpfcandlt_btagSip3dVal_sort, 0, 100]
+            - [cpfcandlt_btagSip3dSig_sort, 0, 0.5]
+            - [cpfcandlt_btagJetDistVal_sort, 0, 40]
+            - [cpfcandlt_pixelBarrelLayersWithMeasurement_sort, 0, 0.1]
+            - [cpfcandlt_pixelEndcapLayersWithMeasurement_sort, 0, 0.1]
+            - [cpfcandlt_stripTECLayersWithMeasurement_sort, 0, 0.1]
+            - [cpfcandlt_stripTIBLayersWithMeasurement_sort, 0, 0.1]
+            - [cpfcandlt_stripTIDLayersWithMeasurement_sort, 0, 0.1]
+            - [cpfcandlt_stripTOBLayersWithMeasurement_sort, 0, 0.1]
+    cpf_vectors:
+        length: 90
+        pad_mode: wrap
+        vars:
+            - [cpfcandlt_px_sort, null]
+            - [cpfcandlt_py_sort, null]
+            - [cpfcandlt_pz_sort, null]
+            - [cpfcandlt_energy_sort, null]
+    cpf_mask:
+        length: 90
+        pad_mode: constant
+        vars:
+            - cpfcandlt_mask
+    npf_features:
+        length: 60
+        pad_mode: wrap
+        vars:
+            - [npfcand_pt_log_nopuppi, 1, 0.5]
+            - [npfcand_e_log_nopuppi, 1.3, 0.5]
+            - npfcand_etarel
+            - npfcand_phirel
+            - [npfcand_abseta, 0.6, 1.6]
+            - npfcand_isGamma
+            - npfcand_isNeutralHad
+    npf_vectors:
+        length: 60
+        pad_mode: wrap
+        vars:
+            - [npfcand_px, null]
+            - [npfcand_py, null]
+            - [npfcand_pz, null]
+            - [npfcand_energy, null]
+    npf_mask:
+        length: 60
+        pad_mode: constant
+        vars:
+            - npfcand_mask
+    sv_features:
+        length: 10
+        pad_mode: wrap
+        vars:
+            - [sv_pt_log, 4, 0.6]
+            - [sv_mass, 1.2, 0.3]
+            - sv_etarel
+            - sv_phirel
+            - [sv_abseta, 0.5, 1.6]
+            - [sv_ntracks, 3, 1]
+            - [sv_normchi2, 0.8, 0.6]
+            - [sv_dxy, 0.4, 0.25]
+            - [sv_dxysig, 7, 0.02]
+            - [sv_d3d, 0.5, 0.2]
+            - [sv_d3dsig, 7, 0.02]
+    sv_vectors:
+        length: 10
+        pad_mode: wrap
+        vars:
+            - [sv_px, null]
+            - [sv_py, null]
+            - [sv_pz, null]
+            - [sv_energy, null]
+    sv_mask:
+        length: 10
+        pad_mode: constant
+        vars:
+            - sv_mask
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: hybrid
+    value: null
+    value_cls_index: fj_label  # just input the label index
+    value_cls_names: [label_Top_bWcs, label_Top_bWqq, label_Top_bWc, label_Top_bWs, label_Top_bWq, label_Top_bWev, label_Top_bWmv, label_Top_bWtauev, label_Top_bWtaumv, label_Top_bWtauhv, label_Top_Wcs, label_Top_Wqq, label_Top_Wev, label_Top_Wmv, label_Top_Wtauev, label_Top_Wtaumv, label_Top_Wtauhv, label_H_bb, label_H_cc, label_H_ss, label_H_qq, label_H_bc, label_H_bs, label_H_cs, label_H_gg, label_H_ee, label_H_mm, label_H_tauhtaue, label_H_tauhtaum, label_H_tauhtauh, label_H_WW_cscs, label_H_WW_csqq, label_H_WW_qqqq, label_H_WW_csc, label_H_WW_css, label_H_WW_csq, label_H_WW_qqc, label_H_WW_qqs, label_H_WW_qqq, label_H_WW_csev, label_H_WW_qqev, label_H_WW_csmv, label_H_WW_qqmv, label_H_WW_cstauev, label_H_WW_qqtauev, label_H_WW_cstaumv, label_H_WW_qqtaumv, label_H_WW_cstauhv, label_H_WW_qqtauhv, label_H_WxWx_cscs, label_H_WxWx_csqq, label_H_WxWx_qqqq, label_H_WxWx_csc, label_H_WxWx_css, label_H_WxWx_csq, label_H_WxWx_qqc, label_H_WxWx_qqs, label_H_WxWx_qqq, label_H_WxWx_csev, label_H_WxWx_qqev, label_H_WxWx_csmv, label_H_WxWx_qqmv, label_H_WxWx_cstauev, label_H_WxWx_qqtauev, label_H_WxWx_cstaumv, label_H_WxWx_qqtaumv, label_H_WxWx_cstauhv, label_H_WxWx_qqtauhv, label_H_WxWxStar_cscs, label_H_WxWxStar_csqq, label_H_WxWxStar_qqqq, label_H_WxWxStar_csc, label_H_WxWxStar_css, label_H_WxWxStar_csq, label_H_WxWxStar_qqc, label_H_WxWxStar_qqs, label_H_WxWxStar_qqq, label_H_WxWxStar_csev, label_H_WxWxStar_qqev, label_H_WxWxStar_csmv, label_H_WxWxStar_qqmv, label_H_WxWxStar_cstauev, label_H_WxWxStar_qqtauev, label_H_WxWxStar_cstaumv, label_H_WxWxStar_qqtaumv, label_H_WxWxStar_cstauhv, label_H_WxWxStar_qqtauhv, label_H_ZZ_bbbb, label_H_ZZ_bbcc, label_H_ZZ_bbss, label_H_ZZ_bbqq, label_H_ZZ_cccc, label_H_ZZ_ccss, label_H_ZZ_ccqq, label_H_ZZ_ssss, label_H_ZZ_ssqq, label_H_ZZ_qqqq, label_H_ZZ_bbb, label_H_ZZ_bbc, label_H_ZZ_bbs, label_H_ZZ_bbq, label_H_ZZ_ccb, label_H_ZZ_ccc, label_H_ZZ_ccs, label_H_ZZ_ccq, label_H_ZZ_ssb, label_H_ZZ_ssc, label_H_ZZ_sss, label_H_ZZ_ssq, label_H_ZZ_qqb, label_H_ZZ_qqc, label_H_ZZ_qqs, label_H_ZZ_qqq, label_H_ZZ_bbee, label_H_ZZ_bbmm, label_H_ZZ_bbe, label_H_ZZ_bbm, label_H_ZZ_bee, label_H_ZZ_bmm, label_H_ZZ_bbtauhtaue, label_H_ZZ_bbtauhtaum, label_H_ZZ_bbtauhtauh, label_H_ZZ_btauhtaue, label_H_ZZ_btauhtaum, label_H_ZZ_btauhtauh, label_H_ZZ_ccee, label_H_ZZ_ccmm, label_H_ZZ_cce, label_H_ZZ_ccm, label_H_ZZ_cee, label_H_ZZ_cmm, label_H_ZZ_cctauhtaue, label_H_ZZ_cctauhtaum, label_H_ZZ_cctauhtauh, label_H_ZZ_ctauhtaue, label_H_ZZ_ctauhtaum, label_H_ZZ_ctauhtauh, label_H_ZZ_ssee, label_H_ZZ_ssmm, label_H_ZZ_sse, label_H_ZZ_ssm, label_H_ZZ_see, label_H_ZZ_smm, label_H_ZZ_sstauhtaue, label_H_ZZ_sstauhtaum, label_H_ZZ_sstauhtauh, label_H_ZZ_stauhtaue, label_H_ZZ_stauhtaum, label_H_ZZ_stauhtauh, label_H_ZZ_qqee, label_H_ZZ_qqmm, label_H_ZZ_qqe, label_H_ZZ_qqm, label_H_ZZ_qee, label_H_ZZ_qmm, label_H_ZZ_qqtauhtaue, label_H_ZZ_qqtauhtaum, label_H_ZZ_qqtauhtauh, label_H_ZZ_qtauhtaue, label_H_ZZ_qtauhtaum, label_H_ZZ_qtauhtauh, label_H_ZxZx_bbbb, label_H_ZxZx_bbcc, label_H_ZxZx_bbss, label_H_ZxZx_bbqq, label_H_ZxZx_cccc, label_H_ZxZx_ccss, label_H_ZxZx_ccqq, label_H_ZxZx_ssss, label_H_ZxZx_ssqq, label_H_ZxZx_qqqq, label_H_ZxZx_bbb, label_H_ZxZx_bbc, label_H_ZxZx_bbs, label_H_ZxZx_bbq, label_H_ZxZx_ccb, label_H_ZxZx_ccc, label_H_ZxZx_ccs, label_H_ZxZx_ccq, label_H_ZxZx_ssb, label_H_ZxZx_ssc, label_H_ZxZx_sss, label_H_ZxZx_ssq, label_H_ZxZx_qqb, label_H_ZxZx_qqc, label_H_ZxZx_qqs, label_H_ZxZx_qqq, label_H_ZxZx_bbee, label_H_ZxZx_bbmm, label_H_ZxZx_bbe, label_H_ZxZx_bbm, label_H_ZxZx_bee, label_H_ZxZx_bmm, label_H_ZxZx_bbtauhtaue, label_H_ZxZx_bbtauhtaum, label_H_ZxZx_bbtauhtauh, label_H_ZxZx_btauhtaue, label_H_ZxZx_btauhtaum, label_H_ZxZx_btauhtauh, label_H_ZxZx_ccee, label_H_ZxZx_ccmm, label_H_ZxZx_cce, label_H_ZxZx_ccm, label_H_ZxZx_cee, label_H_ZxZx_cmm, label_H_ZxZx_cctauhtaue, label_H_ZxZx_cctauhtaum, label_H_ZxZx_cctauhtauh, label_H_ZxZx_ctauhtaue, label_H_ZxZx_ctauhtaum, label_H_ZxZx_ctauhtauh, label_H_ZxZx_ssee, label_H_ZxZx_ssmm, label_H_ZxZx_sse, label_H_ZxZx_ssm, label_H_ZxZx_see, label_H_ZxZx_smm, label_H_ZxZx_sstauhtaue, label_H_ZxZx_sstauhtaum, label_H_ZxZx_sstauhtauh, label_H_ZxZx_stauhtaue, label_H_ZxZx_stauhtaum, label_H_ZxZx_stauhtauh, label_H_ZxZx_qqee, label_H_ZxZx_qqmm, label_H_ZxZx_qqe, label_H_ZxZx_qqm, label_H_ZxZx_qee, label_H_ZxZx_qmm, label_H_ZxZx_qqtauhtaue, label_H_ZxZx_qqtauhtaum, label_H_ZxZx_qqtauhtauh, label_H_ZxZx_qtauhtaue, label_H_ZxZx_qtauhtaum, label_H_ZxZx_qtauhtauh, label_H_ZxZxStar_bbbb, label_H_ZxZxStar_bbcc, label_H_ZxZxStar_bbss, label_H_ZxZxStar_bbqq, label_H_ZxZxStar_cccc, label_H_ZxZxStar_ccss, label_H_ZxZxStar_ccqq, label_H_ZxZxStar_ssss, label_H_ZxZxStar_ssqq, label_H_ZxZxStar_qqqq, label_H_ZxZxStar_bbb, label_H_ZxZxStar_bbc, label_H_ZxZxStar_bbs, label_H_ZxZxStar_bbq, label_H_ZxZxStar_ccb, label_H_ZxZxStar_ccc, label_H_ZxZxStar_ccs, label_H_ZxZxStar_ccq, label_H_ZxZxStar_ssb, label_H_ZxZxStar_ssc, label_H_ZxZxStar_sss, label_H_ZxZxStar_ssq, label_H_ZxZxStar_qqb, label_H_ZxZxStar_qqc, label_H_ZxZxStar_qqs, label_H_ZxZxStar_qqq, label_H_ZxZxStar_bbee, label_H_ZxZxStar_bbmm, label_H_ZxZxStar_bbe, label_H_ZxZxStar_bbm, label_H_ZxZxStar_bee, label_H_ZxZxStar_bmm, label_H_ZxZxStar_bbtauhtaue, label_H_ZxZxStar_bbtauhtaum, label_H_ZxZxStar_bbtauhtauh, label_H_ZxZxStar_btauhtaue, label_H_ZxZxStar_btauhtaum, label_H_ZxZxStar_btauhtauh, label_H_ZxZxStar_ccee, label_H_ZxZxStar_ccmm, label_H_ZxZxStar_cce, label_H_ZxZxStar_ccm, label_H_ZxZxStar_cee, label_H_ZxZxStar_cmm, label_H_ZxZxStar_cctauhtaue, label_H_ZxZxStar_cctauhtaum, label_H_ZxZxStar_cctauhtauh, label_H_ZxZxStar_ctauhtaue, label_H_ZxZxStar_ctauhtaum, label_H_ZxZxStar_ctauhtauh, label_H_ZxZxStar_ssee, label_H_ZxZxStar_ssmm, label_H_ZxZxStar_sse, label_H_ZxZxStar_ssm, label_H_ZxZxStar_see, label_H_ZxZxStar_smm, label_H_ZxZxStar_sstauhtaue, label_H_ZxZxStar_sstauhtaum, label_H_ZxZxStar_sstauhtauh, label_H_ZxZxStar_stauhtaue, label_H_ZxZxStar_stauhtaum, label_H_ZxZxStar_stauhtauh, label_H_ZxZxStar_qqee, label_H_ZxZxStar_qqmm, label_H_ZxZxStar_qqe, label_H_ZxZxStar_qqm, label_H_ZxZxStar_qee, label_H_ZxZxStar_qmm, label_H_ZxZxStar_qqtauhtaue, label_H_ZxZxStar_qqtauhtaum, label_H_ZxZxStar_qqtauhtauh, label_H_ZxZxStar_qtauhtaue, label_H_ZxZxStar_qtauhtaum, label_H_ZxZxStar_qtauhtauh, label_QCD_bb, label_QCD_cc, label_QCD_b, label_QCD_c, label_QCD_others, label_Cust_btaue, label_Cust_btaum, label_Cust_btauh]
+    value_custom:
+        target_res_mass_factor: np.where(fj_isQCD, fj_genjet_sdmass, fj_gen_mass) / fj_mass
+        target_parts_mass_factor: np.where(fj_isQCD, fj_genjet_nomu_sdmass, fj_genparts_mass) / fj_mass
+
+observers:
+    - event_no
+    - fj_label
+    - fj_pt
+    - fj_eta
+    - fj_phi
+    - fj_mass
+    - fj_sdmass
+    - fj_sdmass_fromsubjets
+    - fj_gen_mass
+    - fj_genparts_mass
+    - fj_genjet_sdmass
+    - fj_genjet_nomu_sdmass
+    - sample_isQCD
+
+weights:
+    ### [option 1] use precomputed weights stored in the input files
+    # use_precomputed_weights: true
+    # weight_branches: [weight, class_weight]
+    ### [option 2] compute weights on-the-fly using reweighting histograms
+    use_precomputed_weights: false
+    reweight_method: flat
+    reweight_vars:
+        fj_pt: [200, 251, 316, 398, 501, 630, 793, 997, 1255, 1579, 1987, 2500]
+        fj_sdmass: [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260]
+    reweight_classes:
+        [
+          label_Top_bWQQ, label_Top_bWQ, label_Top_bWev, label_Top_bWmv, label_Top_bWtauev, label_Top_bWtaumv, label_Top_bWtauhv, 
+          label_Top_WQQ, label_Top_Wev, label_Top_Wmv, label_Top_Wtauev, label_Top_Wtaumv, label_Top_Wtauhv, 
+          label_H_bb, label_H_cc, label_H_ss, label_H_qq, label_H_bc, label_H_bs, label_H_cs, label_H_gg, label_H_ee, label_H_mm, label_H_tauhtaue, label_H_tauhtaum, label_H_tauhtauh, 
+          label_H_WW_QQQQ, label_H_WW_QQQ, label_H_WW_QQev, label_H_WW_QQmv, label_H_WW_QQtauev, label_H_WW_QQtaumv, label_H_WW_QQtauhv, 
+          label_H_WxWx_QQQQ, label_H_WxWx_QQQ, label_H_WxWx_QQev, label_H_WxWx_QQmv, label_H_WxWx_QQtauev, label_H_WxWx_QQtaumv, label_H_WxWx_QQtauhv, 
+          label_H_WxWxStar_QQQQ, label_H_WxWxStar_QQQ, label_H_WxWxStar_QQev, label_H_WxWxStar_QQmv, label_H_WxWxStar_QQtauev, label_H_WxWxStar_QQtaumv, label_H_WxWxStar_QQtauhv, 
+          label_H_ZZ_QQQQ, label_H_ZZ_QQQ, label_H_ZZ_QQee, label_H_ZZ_QQmm, label_H_ZZ_QQe, label_H_ZZ_QQm, label_H_ZZ_Qee, label_H_ZZ_Qmm, label_H_ZZ_QQtauhtaue, label_H_ZZ_QQtauhtaum, label_H_ZZ_QQtauhtauh, label_H_ZZ_Qtauhtaue, label_H_ZZ_Qtauhtaum, label_H_ZZ_Qtauhtauh, 
+          label_H_ZxZx_QQQQ, label_H_ZxZx_QQQ, label_H_ZxZx_QQee, label_H_ZxZx_QQmm, label_H_ZxZx_QQe, label_H_ZxZx_QQm, label_H_ZxZx_Qee, label_H_ZxZx_Qmm, label_H_ZxZx_QQtauhtaue, label_H_ZxZx_QQtauhtaum, label_H_ZxZx_QQtauhtauh, label_H_ZxZx_Qtauhtaue, label_H_ZxZx_Qtauhtaum, label_H_ZxZx_Qtauhtauh, 
+          label_H_ZxZxStar_QQQQ, label_H_ZxZxStar_QQQ, label_H_ZxZxStar_QQee, label_H_ZxZxStar_QQmm, label_H_ZxZxStar_QQe, label_H_ZxZxStar_QQm, label_H_ZxZxStar_Qee, label_H_ZxZxStar_Qmm, label_H_ZxZxStar_QQtauhtaue, label_H_ZxZxStar_QQtauhtaum, label_H_ZxZxStar_QQtauhtauh, label_H_ZxZxStar_Qtauhtaue, label_H_ZxZxStar_Qtauhtaum, label_H_ZxZxStar_Qtauhtauh, 
+          label_QCD, 
+          label_Cust_btaue, label_Cust_btaum, label_Cust_btauh,
+        ]
+    class_weights:
+      [
+        0.32, 0.08, 0.2, 0.2, 0.03, 0.03, 0.14,
+        0.024, 0.004, 0.004, 0.001, 0.001, 0.003,
+        0.16, 0.16, 0.16, 0.16, 0.16, 0.16, 0.16, 0.16, 0.08, 0.08, 0.08, 0.08, 0.2,
+        0.16, 0.04, 0.1, 0.1, 0.015, 0.015, 0.07,
+        0.08, 0.02, 0.05, 0.05, 0.0075, 0.0075, 0.035, 
+        0.08, 0.02, 0.05, 0.05, 0.0075, 0.0075, 0.035, 
+        0.16, 0.04, 0.08, 0.08, 0.012, 0.012, 0.016, 0.016, 0.016, 0.016, 0.048, 0.0008, 0.0008, 0.0024,
+        0.08, 0.02, 0.04, 0.04, 0.006, 0.006, 0.008, 0.008, 0.008, 0.008, 0.024, 0.0004, 0.0004, 0.0012,
+        0.08, 0.02, 0.04, 0.04, 0.006, 0.006, 0.008, 0.008, 0.008, 0.008, 0.024, 0.0004, 0.0004, 0.0012,
+        1, 
+        0.04, 0.04, 0.1,
+      ]
+    reweight_hists:
