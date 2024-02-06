@@ -39,6 +39,7 @@ def get_model(data_config, **kwargs):
         # misc
         trim=True,
         for_inference=False,
+        num_classes_cls=data_config.label_value_cls_num, # for onnx export
     )
     cfg.update(**kwargs)
     _logger.info('Model config: %s' % str(cfg))

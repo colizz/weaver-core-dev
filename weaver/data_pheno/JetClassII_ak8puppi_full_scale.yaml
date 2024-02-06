@@ -1,22 +1,30 @@
 selection:
    ### use `&`, `|`, `~` for logical operations on numpy arrays
    ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
-   (jet_pt > 120) & (jet_pt < 2500) & (jet_sdmass > 20) & (jet_sdmass < 500)
+   (jet_pt > 200) & (jet_pt < 2500) & (jet_sdmass > 20) & (jet_sdmass < 500)
 
 new_variables:
    ### [format] name: formula
    ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
    part_mask: ak.ones_like(part_energy)
+
+   ## first calculating scaled vectors
+   part_px_scale: part_px / jet_pt * 500
+   part_py_scale: part_py / jet_pt * 500
+   part_pz_scale: part_pz / jet_pt * 500
+   part_energy_scale: part_energy / jet_pt * 500
+
    part_pt: np.hypot(part_px, part_py)
-   part_pt_log: np.log(part_pt)
-   part_e_log: np.log(part_energy)
+   part_pt_scale: np.hypot(part_px_scale, part_py_scale)
+   part_pt_scale_log: np.log(part_pt_scale)
+   part_e_scale_log: np.log(part_energy_scale)
    part_logptrel: np.log(part_pt/jet_pt)
    part_logerel: np.log(part_energy/jet_energy)
    part_deltaR: np.hypot(part_deta, part_dphi)
    part_d0: np.tanh(part_d0val)
    part_dz: np.tanh(part_dzval)
    part_isElectron: (part_pid == 11) | (part_pid == -11)
-   part_isMuon: (part_pid == 11) | (part_pid == -13)
+   part_isMuon: (part_pid == 13) | (part_pid == -13)
    part_isPhoton: (part_pid == 22)
    part_isChargedHadron: (part_charge != 0) & (~part_isElectron) & (~part_isMuon)
    part_isNeutralHadron: (part_charge == 0) & (~part_isPhoton)
@@ -85,8 +93,8 @@ inputs:
       ###              clip_min(optional, default=-5), 
       ###              clip_max(optional, default=5), 
       ###              pad_value(optional, default=0)]
-         - [part_pt_log, 1.7, 0.7]
-         - [part_e_log, 2.0, 0.7]
+         - [part_pt_scale_log, 1.7, 0.7]
+         - [part_e_scale_log, 2.0, 0.7]
          - [part_logptrel, -4.7, 0.7]
          - [part_logerel, -4.7, 0.7]
          - [part_deltaR, 0.2, 4.0]
@@ -106,10 +114,10 @@ inputs:
       length: 128
       pad_mode: wrap
       vars: 
-         - [part_px, null]
-         - [part_py, null]
-         - [part_pz, null]
-         - [part_energy, null]
+         - [part_px_scale, null]
+         - [part_py_scale, null]
+         - [part_pz_scale, null]
+         - [part_energy_scale, null]
    pf_mask:
       length: 128
       pad_mode: constant
@@ -144,7 +152,7 @@ weights:
    use_precomputed_weights: false
    reweight_method: flat
    reweight_vars:
-      jet_pt: [120, 149, 185, 230, 286, 355, 441, 548, 680, 845, 1050, 1304, 1620, 2013, 2500]
+      jet_pt: [200, 240, 287, 344, 412, 493, 590, 707, 847, 1014, 1215, 1455, 1743, 2087, 2500]
       jet_sdmass: [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310, 320, 330, 340, 350, 360, 370, 380, 390, 400, 410, 420, 430, 440, 450, 460, 470, 480, 490, 500]
    reweight_classes:
       [
@@ -157,11 +165,11 @@ weights:
       ]
    class_weights:
       [
-         0.4, 0.03, 0.28, 0.02, 0.03,
-         0.32, 0.06, 0.0075, 0.05, 0.005, 0.005, 0.0005,
-         0.24, 0.01, 0.012, 0.054, 0.054, 0.0018, 0.0024,
-         0.06, 0.0025, 0.003, 0.0135, 0.0135, 0.00045, 0.0006,
+         0.4, 0.05, 0.08, 0.01, 0.015,
+         0.32, 0.06, 0.0075, 0.05, 0.005, 0.005, 0.0015,
+         0.16, 0.01, 0.012, 0.04, 0.04, 0.0018, 0.0024,
+         0.04, 0.0025, 0.003, 0.01, 0.01, 0.00045, 0.0006,
          0.08, 0.015, 0.05,
-         0.5,
+         0.25,
       ]
    reweight_hists:

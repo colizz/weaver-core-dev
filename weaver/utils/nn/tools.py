@@ -211,11 +211,12 @@ def evaluate_classification(model, test_loader, dev, epoch, for_training=True, l
                 ("Loss/eval - Loss/train (epoch)", total_loss / count - train_loss, epoch),
                 ])
 
-    scores = np.concatenate(scores)
-    labels = {k: _concat(v) for k, v in labels.items()}
-    metric_results = evaluate_metrics(labels[data_config.label_names[0]], scores, eval_metrics=eval_metrics)
-    _logger.info('Evaluation metrics: \n%s', '\n'.join(
-        ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results.items()]))
+    if not for_training:
+        scores = np.concatenate(scores)
+        labels = {k: _concat(v) for k, v in labels.items()}
+        metric_results = evaluate_metrics(labels[data_config.label_names[0]], scores, eval_metrics=eval_metrics)
+        _logger.info('Evaluation metrics: \n%s', '\n'.join(
+            ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results.items()]))
 
     if for_training:
         return total_correct / count if best_val_metrics != 'loss' else total_loss / count

@@ -6,6 +6,7 @@ predict
 runs*
 *.root
 weaver-custom
+weaver/data_pheno/deprecated
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
