@@ -1,0 +1,73 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `ak` in the expression
+
+selection: >-
+    (((jet_sdmass >= 110) & (jet_sdmass < 270))) & ((event_class <= 18) | ((event_class == 19) & (event_no % 100 < (10000 / 100))) )
+
+### selection to apply at test time (i.e., when running w/ --predict)
+test_time_selection: >-
+    (jet_sdmass >= 120)
+
+new_variables:
+    ### [format] name: formula
+    ### can use functions from `math`, `np` (numpy), and `ak` in the expression
+    # training categories
+    label_sb0: (jet_sdmass >= 110) & (jet_sdmass < 120)
+    label_sb1: (jet_sdmass >= 120) & (jet_sdmass < 130)
+    label_sb2: (jet_sdmass >= 130) & (jet_sdmass < 140)
+    label_sb3: (jet_sdmass >= 140) & (jet_sdmass < 150)
+    label_sb4: (jet_sdmass >= 150) & (jet_sdmass < 160)
+    label_sb5: (jet_sdmass >= 160) & (jet_sdmass < 170)
+    label_sb6: (jet_sdmass >= 170) & (jet_sdmass < 180)
+    label_sb7: (jet_sdmass >= 180) & (jet_sdmass < 190)
+    label_sb8: (jet_sdmass >= 190) & (jet_sdmass < 200)
+    label_sb9: (jet_sdmass >= 200) & (jet_sdmass < 210)
+    label_sb10: (jet_sdmass >= 210) & (jet_sdmass < 220)
+    label_sb11: (jet_sdmass >= 220) & (jet_sdmass < 230)
+    label_sb12: (jet_sdmass >= 230) & (jet_sdmass < 240)
+    label_sb13: (jet_sdmass >= 240) & (jet_sdmass < 250)
+    label_sb14: (jet_sdmass >= 250) & (jet_sdmass < 260)
+    label_sb15: (jet_sdmass >= 260) & (jet_sdmass < 270)
+    label_index: np.argmax(np.stack([label_sb0, label_sb1, label_sb2, label_sb3, label_sb4, label_sb5, label_sb6, label_sb7, label_sb8, label_sb9, label_sb10, label_sb11, label_sb12, label_sb13, label_sb14, label_sb15], -1), -1)
+
+preprocess:
+    ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+    method: manual
+    ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+    data_fraction:
+
+inputs:
+    ft_vars:
+        length: 128
+        pad_mode: constant
+        vars:
+            - [jet_hidneurons, null]
+    label_vars:
+        length: null
+        vars:
+            - [label_index, null]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: simple
+    value: [label_sb0, label_sb1, label_sb2, label_sb3, label_sb4, label_sb5, label_sb6, label_sb7, label_sb8, label_sb9, label_sb10, label_sb11, label_sb12, label_sb13, label_sb14, label_sb15]
+
+
+observers:
+    - event_no
+    - event_class
+    - jet_sdmass
+
+weights:
+   ### [option 1] use precomputed weights stored in the input files
+   # use_precomputed_weights: true
+   # weight_branches: [weight, class_weight]
+   ### [option 2] compute weights on-the-fly using reweighting histograms
+   use_precomputed_weights: false
+   reweight_method: flat
+   reweight_vars:
+      label_sb0: [-10000, 100000] # dummy
+      label_sb1: [-10000, 100000] # dummy
+   reweight_classes: [label_sb0, label_sb1, label_sb2, label_sb3, label_sb4, label_sb5, label_sb6, label_sb7, label_sb8, label_sb9, label_sb10, label_sb11, label_sb12, label_sb13, label_sb14, label_sb15]
+   class_weights: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+   reweight_hists:

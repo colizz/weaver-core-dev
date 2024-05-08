@@ -782,6 +782,108 @@ class ParticleTransformerTagger_3coll(nn.Module):
             return self.part(x, v, mask)
 
 
+class ParticleTransformerTagger_ncoll(nn.Module):
+
+    def __init__(self,
+                 input_dims, # tuples
+                 share_embed=False,
+                 num_classes=None,
+                 # network configurations
+                 pair_input_dim=4,
+                 pair_extra_dim=0,
+                 remove_self_pair=False,
+                 use_pre_activation_pair=True,
+                 embed_dims=[128, 512, 128],
+                 pair_embed_dims=[64, 64, 64],
+                 num_heads=8,
+                 num_layers=8,
+                 num_cls_layers=2,
+                 block_params=None,
+                 cls_block_params={'dropout': 0, 'attn_dropout': 0, 'activation_dropout': 0},
+                 fc_params=[],
+                 activation='gelu',
+                 enable_mem_efficient=False,
+                 # misc
+                 trim=True,
+                 for_inference=False,
+                 num_classes_cls=None, # for onnx export
+                 use_amp=False,
+                 return_embed=False,
+                 export_embed=False,
+                 **kwargs) -> None:
+        super().__init__(**kwargs)
+
+        self.use_amp = use_amp
+
+        self.num_colls = len(input_dims)
+        self.share_embed = share_embed
+        self.trimmers = nn.ModuleList()
+        self.input_embeds = nn.ModuleList()
+        for dim in input_dims:
+            self.trimmers.append(SequenceTrimmer(enabled=trim and not for_inference))
+            if self.share_embed == False:
+                self.input_embeds.append(Embed(dim, embed_dims, activation=activation))
+        if self.share_embed:
+            self.input_embed = Embed(input_dims[0], embed_dims, activation=activation)
+
+        self.part = ParticleTransformer(input_dim=embed_dims[-1],
+                                        num_classes=num_classes,
+                                        # network configurations
+                                        pair_input_dim=pair_input_dim,
+                                        pair_extra_dim=pair_extra_dim,
+                                        remove_self_pair=remove_self_pair,
+                                        use_pre_activation_pair=use_pre_activation_pair,
+                                        embed_dims=[],
+                                        pair_embed_dims=pair_embed_dims,
+                                        num_heads=num_heads,
+                                        num_layers=num_layers,
+                                        num_cls_layers=num_cls_layers,
+                                        block_params=block_params,
+                                        cls_block_params=cls_block_params,
+                                        fc_params=fc_params,
+                                        activation=activation,
+                                        enable_mem_efficient=enable_mem_efficient,
+                                        # misc
+                                        trim=False,
+                                        for_inference=for_inference,
+                                        num_classes_cls=num_classes_cls, # for onnx export
+                                        use_amp=use_amp,
+                                        return_embed=return_embed,
+                                        export_embed=export_embed)
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return {'part.cls_token', }
+
+    # def forward(self, cpf_x, cpf_v=None, cpf_mask=None, npf_x=None, npf_v=None, npf_mask=None, sv_x=None, sv_v=None, sv_mask=None):
+    def forward(self, *args):
+        # x: (N, C, P)
+        # v: (N, 4, P) [px,py,pz,energy]
+        # mask: (N, 1, P) -- real particle = 1, padded = 0
+
+        assert len(args) == 3 * self.num_colls
+
+        with torch.no_grad():
+            x, v, mask = [], [], []
+            for i in range(self.num_colls):
+                x_, v_, mask_, _ = self.trimmers[i](args[i*3], args[i*3+1], args[i*3+2])
+                x.append(x_)
+                v.append(v_)
+                mask.append(mask_)
+
+            v = torch.cat(v, dim=2)
+            mask = torch.cat(mask, dim=2)
+
+        with torch.cuda.amp.autocast(enabled=self.use_amp):
+            if self.share_embed == False:
+                x = [self.input_embeds[i](x[i]) for i in range(self.num_colls)] # after embed: (seq_len, batch, embed_dim)
+            else:
+                x = [self.input_embed(x[i]) for i in range(self.num_colls)]
+            x = torch.cat(x, dim=0)
+
+            return self.part(x, v, mask)
+
+
 class ParticleTransformerTaggerWithExtraPairFeatures(nn.Module):
 
     def __init__(self,

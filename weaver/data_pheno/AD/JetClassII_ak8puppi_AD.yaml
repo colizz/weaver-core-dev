@@ -1,0 +1,42 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `ak` in the expression
+
+selection: >-
+    (jet_sdmass > 50) & (event_no%2 == 0)
+
+### selection to apply at test time (i.e., when running w/ --predict)
+test_time_selection: >-
+    (jet_sdmass > 50) & (event_no%2 == 1)
+
+new_variables:
+    ### [format] name: formula
+    ### can use functions from `math`, `np` (numpy), and `ak` in the expression
+    # classes for reweighting
+    label_bin_idx: np.searchsorted([50.000-0.001, 50.752, 51.508, 52.267, 53.033, 53.806, 54.585, 55.369, 56.160, 56.963, 57.772, 58.591, 59.419, 60.259, 61.109, 61.971, 62.844, 63.727, 64.624, 65.528, 66.448, 67.382, 68.326, 69.280, 70.250, 71.230, 72.219, 73.224, 74.237, 75.259, 76.298, 77.347, 78.405, 79.477, 80.554, 81.647, 82.746, 83.863, 84.997, 86.140, 87.295, 88.463, 89.646, 90.845, 92.055, 93.275, 94.513, 95.762, 97.027, 98.314, 99.613, 100.930, 102.253, 103.600, 104.960, 106.336, 107.734, 109.145, 110.578, 112.021, 113.482, 114.970, 116.479, 118.004, 119.553, 121.133, 122.732, 124.363, 126.028, 127.723, 129.442, 131.207, 133.007, 134.850, 136.737, 138.670, 140.668, 142.707, 144.808, 146.974, 149.213, 151.531, 153.931, 156.443, 159.047, 161.785, 164.638, 167.647, 170.842, 174.243, 177.867, 181.801, 186.106, 190.886, 196.342, 202.690, 210.439, 220.395, 234.576, 259.753], ak.to_numpy(jet_sdmass), side='right') - 1
+
+
+preprocess:
+    ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+    method: manual
+    ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+    data_fraction:
+
+inputs:
+    ft_vars:
+        length: 128
+        pad_mode: constant
+        vars:
+            - [jet_hidneurons, null]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: simple
+    value: null
+    value_cls_index: label_bin_idx  # just input the label index
+    value_cls_names: [label_bin_0, label_bin_1, label_bin_2, label_bin_3, label_bin_4, label_bin_5, label_bin_6, label_bin_7, label_bin_8, label_bin_9, label_bin_10, label_bin_11, label_bin_12, label_bin_13, label_bin_14, label_bin_15, label_bin_16, label_bin_17, label_bin_18, label_bin_19, label_bin_20, label_bin_21, label_bin_22, label_bin_23, label_bin_24, label_bin_25, label_bin_26, label_bin_27, label_bin_28, label_bin_29, label_bin_30, label_bin_31, label_bin_32, label_bin_33, label_bin_34, label_bin_35, label_bin_36, label_bin_37, label_bin_38, label_bin_39, label_bin_40, label_bin_41, label_bin_42, label_bin_43, label_bin_44, label_bin_45, label_bin_46, label_bin_47, label_bin_48, label_bin_49, label_bin_50, label_bin_51, label_bin_52, label_bin_53, label_bin_54, label_bin_55, label_bin_56, label_bin_57, label_bin_58, label_bin_59, label_bin_60, label_bin_61, label_bin_62, label_bin_63, label_bin_64, label_bin_65, label_bin_66, label_bin_67, label_bin_68, label_bin_69, label_bin_70, label_bin_71, label_bin_72, label_bin_73, label_bin_74, label_bin_75, label_bin_76, label_bin_77, label_bin_78, label_bin_79, label_bin_80, label_bin_81, label_bin_82, label_bin_83, label_bin_84, label_bin_85, label_bin_86, label_bin_87, label_bin_88, label_bin_89, label_bin_90, label_bin_91, label_bin_92, label_bin_93, label_bin_94, label_bin_95, label_bin_96, label_bin_97, label_bin_98, label_bin_99]
+
+
+observers:
+    - event_no
+    - event_class
+    - jet_sdmass

@@ -1,0 +1,58 @@
+treename: null
+selection: (jet_sdmass >= 110) & (jet_sdmass < 270) & ((event_class <= 18) | ((event_class
+  == 19) & (event_no % 100 < (10000 / 100))) )
+test_time_selection: (jet_sdmass >= 120)
+preprocess:
+  method: manual
+  data_fraction: null
+  params: null
+new_variables:
+  label_sr: (jet_sdmass >= 150) & (jet_sdmass < 230)
+  label_sb: ((jet_sdmass >= 110) & (jet_sdmass < 150) | (jet_sdmass >= 230) & (jet_sdmass
+    < 270))
+  label_index: np.argmax(np.stack([label_sr, label_sb], -1), -1)
+  _label_: np.argmax(np.stack([label_sr,label_sb], axis=1), axis=1)
+  _labelcheck_: np.sum(np.stack([label_sr,label_sb], axis=1), axis=1)
+inputs:
+  ft_vars:
+    length: 128
+    pad_mode: constant
+    vars:
+    - - jet_hidneurons
+      - null
+  label_vars:
+    length: null
+    vars:
+    - - label_index
+      - null
+labels:
+  type: simple
+  value:
+  - label_sr
+  - label_sb
+observers:
+- event_no
+- event_class
+- jet_sdmass
+monitor_variables: []
+weights:
+  use_precomputed_weights: false
+  reweight_method: flat
+  reweight_vars:
+    label_sr:
+    - -10000
+    - 100000
+    label_sb:
+    - -10000
+    - 100000
+  reweight_classes:
+  - label_sr
+  - label_sb
+  class_weights:
+  - 1
+  - 1
+  reweight_hists:
+    label_sr:
+    - - 0.8999999761581421
+    label_sb:
+    - - 0.7209630608558655

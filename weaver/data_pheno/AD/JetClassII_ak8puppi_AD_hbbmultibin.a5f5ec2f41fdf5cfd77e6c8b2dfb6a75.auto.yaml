@@ -1,0 +1,119 @@
+treename: null
+selection: (jet_sdmass >= 90) & (jet_sdmass < 150) & ((event_class <= 18))
+test_time_selection: (jet_sdmass >= 90) & (jet_sdmass < 150) & ((event_class <= 18))
+preprocess:
+  method: manual
+  data_fraction: null
+  params: null
+new_variables:
+  label_bin_idx: np.searchsorted([90.-1, 92.5, 95., 97.5, 100., 102.5, 105., 107.5,
+    110., 112.5, 115., 117.5, 120., 122.5, 125., 127.5, 130., 132.5, 135., 137.5,
+    140., 142.5, 145., 147.5], ak.to_numpy(jet_sdmass), side='right') - 1
+  label_all: jet_sdmass > 0
+  _label_: label_bin_idx
+  _labelcheck_: ak.ones_like(label_bin_idx)
+inputs:
+  ft_vars:
+    length: 128
+    pad_mode: constant
+    vars:
+    - - jet_hidneurons
+      - null
+labels:
+  type: simple
+  value: null
+  value_cls_index: label_bin_idx
+  value_cls_names:
+  - label_bin_0
+  - label_bin_1
+  - label_bin_2
+  - label_bin_3
+  - label_bin_4
+  - label_bin_5
+  - label_bin_6
+  - label_bin_7
+  - label_bin_8
+  - label_bin_9
+  - label_bin_10
+  - label_bin_11
+  - label_bin_12
+  - label_bin_13
+  - label_bin_14
+  - label_bin_15
+  - label_bin_16
+  - label_bin_17
+  - label_bin_18
+  - label_bin_19
+  - label_bin_20
+  - label_bin_21
+  - label_bin_22
+  - label_bin_23
+observers:
+- event_no
+- event_class
+- jet_sdmass
+monitor_variables: []
+weights:
+  use_precomputed_weights: false
+  reweight_method: flat
+  reweight_vars:
+    jet_pt:
+    - 0
+    - 100000
+    jet_sdmass:
+    - 90.0
+    - 92.5
+    - 95.0
+    - 97.5
+    - 100.0
+    - 102.5
+    - 105.0
+    - 107.5
+    - 110.0
+    - 112.5
+    - 115.0
+    - 117.5
+    - 120.0
+    - 122.5
+    - 125.0
+    - 127.5
+    - 130.0
+    - 132.5
+    - 135.0
+    - 137.5
+    - 140.0
+    - 142.5
+    - 145.0
+    - 147.5
+    - 150.0
+  reweight_classes:
+  - label_all
+  class_weights:
+  - 1.0
+  reweight_threshold: 0
+  reweight_hists:
+    label_all:
+    - - 0.5000234246253967
+      - 0.5150607228279114
+      - 0.5371710062026978
+      - 0.5567402839660645
+      - 0.5721554160118103
+      - 0.5921693444252014
+      - 0.6038844585418701
+      - 0.6226423978805542
+      - 0.6409143209457397
+      - 0.6488000750541687
+      - 0.6553561687469482
+      - 0.6722157001495361
+      - 0.6940562725067139
+      - 0.7024903893470764
+      - 0.7195020914077759
+      - 0.7346973419189453
+      - 0.7526230812072754
+      - 0.7684829235076904
+      - 0.7970789670944214
+      - 0.8112474083900452
+      - 0.8252299427986145
+      - 0.85710209608078
+      - 0.8819965720176697
+      - 0.8999999761581421

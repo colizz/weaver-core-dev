@@ -1,6 +1,7 @@
 import math
 import awkward as ak
 import tqdm
+import re
 import traceback
 from .tools import _concat
 from ..logger import _logger
@@ -224,6 +225,12 @@ def _read_root(filepath, branches, load_range=None, treename=None):
     # for training with v7 and on
     specific_vars = {}
     specific_vars_included = {}
+    # configuration for pheno dataset
+    specific_vars = {
+        "filepath.endswith('40ifb_part0.root') or re.search(r'mixed_ntuple/ntuples_\d*[1267].root$', filepath)": {'file_no': 0},
+        "filepath.endswith('40ifb_part1.root') or re.search(r'mixed_ntuple/ntuples_\d*[3489].root$', filepath)": {'file_no': 1},
+        "filepath.endswith('20ifb.root') or re.search(r'mixed_ntuple/ntuples_\d*[05].root$', filepath)": {'file_no': 2},
+    }
 
     def remove_branch(branches, filepath):
         for expr, new_branch_dict in specific_vars.items():

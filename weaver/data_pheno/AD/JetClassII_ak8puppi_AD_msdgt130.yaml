@@ -1,0 +1,42 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `ak` in the expression
+
+selection: >-
+    (jet_sdmass > 131.207)
+
+### selection to apply at test time (i.e., when running w/ --predict)
+test_time_selection: >-
+    (jet_sdmass > 131.207)
+
+new_variables:
+    ### [format] name: formula
+    ### can use functions from `math`, `np` (numpy), and `ak` in the expression
+    # training categories
+    label_bin_idx: np.searchsorted([131.207-0.001, 133.007, 134.850, 136.737, 138.670, 140.668, 142.707, 144.808, 146.974, 149.213, 151.531, 153.931, 156.443, 159.047, 161.785, 164.638, 167.647, 170.842, 174.243, 177.867, 181.801, 186.106, 190.886, 196.342, 202.690, 210.439, 220.395, 234.576, 259.753], ak.to_numpy(jet_sdmass), side='right') - 1
+
+preprocess:
+    ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+    method: manual
+    ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+    data_fraction:
+
+inputs:
+    ft_vars:
+        length: 128
+        pad_mode: constant
+        vars:
+            - [jet_hidneurons, null]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: simple
+    value: null
+    value_cls_index: label_bin_idx  # just input the label index
+    ## 29 bins in total
+    value_cls_names: [label_bin_71, label_bin_72, label_bin_73, label_bin_74, label_bin_75, label_bin_76, label_bin_77, label_bin_78, label_bin_79, label_bin_80, label_bin_81, label_bin_82, label_bin_83, label_bin_84, label_bin_85, label_bin_86, label_bin_87, label_bin_88, label_bin_89, label_bin_90, label_bin_91, label_bin_92, label_bin_93, label_bin_94, label_bin_95, label_bin_96, label_bin_97, label_bin_98, label_bin_99]
+
+
+observers:
+    - event_no
+    - event_class
+    - jet_sdmass

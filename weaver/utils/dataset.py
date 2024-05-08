@@ -204,6 +204,7 @@ class _SimpleIter(object):
                 if self._in_memory and len(self.indices) > 0:
                     # only need to re-shuffle the indices, if this is not the first entry
                     if self._sampler_options['shuffle']:
+                        _logger.info('Re-shuffle indices, %d' % len(self.indices))
                         np.random.shuffle(self.indices)
                     break
                 if self.prefetch is None:
@@ -229,7 +230,7 @@ class _SimpleIter(object):
         return self.get_data(i)
 
     def _try_get_next(self, init=False):
-        end_of_list = self.ipos >= len(self.filelist) if self._fetch_by_files else self.ipos >= self.load_range[1]
+        end_of_list = self.ipos >= len(self.filelist) if self._fetch_by_files else self.ipos >= self.load_range[1] - 1e-6
         if end_of_list:
             if init:
                 raise RuntimeError('Nothing to load for worker %d' %
@@ -297,7 +298,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         file_fraction (float): fraction of files to load.
     """
 
-    def __init__(self, file_dict, data_config_file, for_training=True, load_range_and_fraction=None,
+    def __init__(self, file_dict, data_config_file, for_training=True, load_range_and_fraction=None, extra_selection=None,
                  fetch_by_files=False, fetch_step=0.01, file_fraction=1, start_pos=None, remake_weights=False, up_sample=True,
                  weight_scale=1, max_resample=10, async_load=True, infinity_mode=False, in_memory=False, name=''):
         self._iters = {} if infinity_mode or in_memory else None
@@ -354,7 +355,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
                 _logger.info(
                     'Found file %s w/ auto-generated preprocessing information, will use that instead!' %
                     data_config_file)
-            self._data_config = DataConfig.load(data_config_file, load_observers=False)
+            self._data_config = DataConfig.load(data_config_file, load_observers=False, extra_selection=extra_selection)
 
         # derive all variables added to self.__dict__
         self._init_args = set(self.__dict__.keys()) - _init_args

@@ -221,11 +221,17 @@ class DataConfig(object):
             yaml.safe_dump(self.options, f, sort_keys=False)
 
     @classmethod
-    def load(cls, fp, load_observers=True):
+    def load(cls, fp, load_observers=True, extra_selection=None, extra_test_selection=None):
         with open(fp) as f:
             options = yaml.safe_load(f)
         if not load_observers:
             options['observers'] = None
+        if extra_selection:
+            options['selection'] = '(%s) & (%s)' % (options['selection'], extra_selection)
+        if extra_test_selection:
+            if 'test_time_selection' not in options:
+                raise RuntimeError('`test_time_selection` is not defined in the yaml file!')
+            options['test_time_selection'] = '(%s) & (%s)' % (options['test_time_selection'], extra_test_selection)
         return cls(**options)
 
     def copy(self):

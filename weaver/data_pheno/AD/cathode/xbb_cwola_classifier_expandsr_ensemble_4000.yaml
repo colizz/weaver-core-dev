@@ -1,0 +1,59 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `ak` in the expression
+
+selection: >-
+    (jet_sdmass >= 110) & (jet_sdmass < 270) & ((event_class <= 18) | ((event_class == 19) & (event_no % 100 < (4000 / 100))) )
+
+### selection to apply at test time (i.e., when running w/ --predict)
+test_time_selection: >-
+    (jet_sdmass >= 120)
+
+new_variables:
+    ### [format] name: formula
+    ### can use functions from `math`, `np` (numpy), and `ak` in the expression
+    # training categories
+    label_sr: (jet_sdmass >= 150) & (jet_sdmass < 230)
+    label_sb: ((jet_sdmass >= 110) & (jet_sdmass < 150) | (jet_sdmass >= 230) & (jet_sdmass < 270))
+    label_index: np.argmax(np.stack([label_sr, label_sb], -1), -1)
+
+preprocess:
+    ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+    method: manual
+    ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+    data_fraction:
+
+inputs:
+    ft_vars:
+        length: 128
+        pad_mode: constant
+        vars:
+            - [jet_hidneurons, null]
+    label_vars:
+        length: null
+        vars:
+            - [label_index, null]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: simple
+    value: [label_sr, label_sb]
+
+
+observers:
+    - event_no
+    - event_class
+    - jet_sdmass
+
+weights:
+   ### [option 1] use precomputed weights stored in the input files
+   # use_precomputed_weights: true
+   # weight_branches: [weight, class_weight]
+   ### [option 2] compute weights on-the-fly using reweighting histograms
+   use_precomputed_weights: false
+   reweight_method: flat
+   reweight_vars:
+      label_sr: [-10000, 100000] # dummy
+      label_sb: [-10000, 100000] # dummy
+   reweight_classes: [label_sr, label_sb]
+   class_weights: [1, 1]
+   reweight_hists:

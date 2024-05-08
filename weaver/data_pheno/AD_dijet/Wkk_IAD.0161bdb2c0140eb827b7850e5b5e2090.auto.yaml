@@ -1,0 +1,61 @@
+treename: null
+selection: (dijet_mass >= 2500) & (dijet_mass < 3100) & ((event_class <= 18) | ((event_class
+  > 18) & (event_no % 2 == 0)))
+test_time_selection: (dijet_mass >= 2200) & (dijet_mass < 3400)
+preprocess:
+  method: manual
+  data_fraction: null
+  params: null
+new_variables:
+  label_data: (dijet_mass >= 2500) & (dijet_mass < 3100) & (event_no % 2 == 0)
+  label_bkg: (dijet_mass >= 2500) & (dijet_mass < 3100) & (event_no % 2 == 1) & (event_class
+    <= 18)
+  label_index: np.argmax(np.stack([label_data, label_bkg], -1), -1)
+  _label_: np.argmax(np.stack([label_data,label_bkg], axis=1), axis=1)
+  _labelcheck_: np.sum(np.stack([label_data,label_bkg], axis=1), axis=1)
+inputs:
+  ft_vars:
+    length: 128
+    pad_mode: constant
+    vars:
+    - - jet_1_hidneurons
+      - null
+    - - jet_2_hidneurons
+      - null
+  label_vars:
+    length: null
+    vars:
+    - - label_index
+      - null
+labels:
+  type: simple
+  value:
+  - label_data
+  - label_bkg
+observers:
+- event_no
+- event_class
+- dijet_mass
+monitor_variables: []
+weights:
+  use_precomputed_weights: false
+  reweight_method: flat
+  reweight_vars:
+    label_data:
+    - -100000
+    - 100000
+    label_bkg:
+    - -100000
+    - 100000
+  reweight_classes:
+  - label_data
+  - label_bkg
+  reweight_threshold: 0
+  class_weights:
+  - 1
+  - 1
+  reweight_hists:
+    label_data:
+    - - 0.8727640509605408
+    label_bkg:
+    - - 0.8999999761581421

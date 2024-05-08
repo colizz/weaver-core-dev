@@ -2427,3 +2427,6 @@ $DATAPATH'/20230826_ak8_UL17_v9/v9-AD-re2/mix_gghww_qcddiv25_msd100to140_seed42.
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
 --predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root \
 --log $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train_{auto}.log --tensorboard _${PREFIX}_{auto}
+
+
+// this is also problematics... Should not use "--fetch-by-files --fetch-step 1 --in-memory" because it only loads 1 file!!

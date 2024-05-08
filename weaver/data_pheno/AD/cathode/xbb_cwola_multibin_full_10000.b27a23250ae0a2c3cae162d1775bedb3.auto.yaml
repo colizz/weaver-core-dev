@@ -1,0 +1,145 @@
+treename: null
+selection: (((jet_sdmass >= 110) & (jet_sdmass < 270))) & ((event_class <= 18) | ((event_class
+  == 19) & (event_no % 100 < (10000 / 100))) )
+test_time_selection: (jet_sdmass >= 120)
+preprocess:
+  method: manual
+  data_fraction: null
+  params: null
+new_variables:
+  label_sb0: (jet_sdmass >= 110) & (jet_sdmass < 120)
+  label_sb1: (jet_sdmass >= 120) & (jet_sdmass < 130)
+  label_sb2: (jet_sdmass >= 130) & (jet_sdmass < 140)
+  label_sb3: (jet_sdmass >= 140) & (jet_sdmass < 150)
+  label_sb4: (jet_sdmass >= 150) & (jet_sdmass < 160)
+  label_sb5: (jet_sdmass >= 160) & (jet_sdmass < 170)
+  label_sb6: (jet_sdmass >= 170) & (jet_sdmass < 180)
+  label_sb7: (jet_sdmass >= 180) & (jet_sdmass < 190)
+  label_sb8: (jet_sdmass >= 190) & (jet_sdmass < 200)
+  label_sb9: (jet_sdmass >= 200) & (jet_sdmass < 210)
+  label_sb10: (jet_sdmass >= 210) & (jet_sdmass < 220)
+  label_sb11: (jet_sdmass >= 220) & (jet_sdmass < 230)
+  label_sb12: (jet_sdmass >= 230) & (jet_sdmass < 240)
+  label_sb13: (jet_sdmass >= 240) & (jet_sdmass < 250)
+  label_sb14: (jet_sdmass >= 250) & (jet_sdmass < 260)
+  label_sb15: (jet_sdmass >= 260) & (jet_sdmass < 270)
+  label_index: np.argmax(np.stack([label_sb0, label_sb1, label_sb2, label_sb3, label_sb4,
+    label_sb5, label_sb6, label_sb7, label_sb8, label_sb9, label_sb10, label_sb11,
+    label_sb12, label_sb13, label_sb14, label_sb15], -1), -1)
+  _label_: np.argmax(np.stack([label_sb0,label_sb1,label_sb2,label_sb3,label_sb4,label_sb5,label_sb6,label_sb7,label_sb8,label_sb9,label_sb10,label_sb11,label_sb12,label_sb13,label_sb14,label_sb15],
+    axis=1), axis=1)
+  _labelcheck_: np.sum(np.stack([label_sb0,label_sb1,label_sb2,label_sb3,label_sb4,label_sb5,label_sb6,label_sb7,label_sb8,label_sb9,label_sb10,label_sb11,label_sb12,label_sb13,label_sb14,label_sb15],
+    axis=1), axis=1)
+inputs:
+  ft_vars:
+    length: 128
+    pad_mode: constant
+    vars:
+    - - jet_hidneurons
+      - null
+  label_vars:
+    length: null
+    vars:
+    - - label_index
+      - null
+labels:
+  type: simple
+  value:
+  - label_sb0
+  - label_sb1
+  - label_sb2
+  - label_sb3
+  - label_sb4
+  - label_sb5
+  - label_sb6
+  - label_sb7
+  - label_sb8
+  - label_sb9
+  - label_sb10
+  - label_sb11
+  - label_sb12
+  - label_sb13
+  - label_sb14
+  - label_sb15
+observers:
+- event_no
+- event_class
+- jet_sdmass
+monitor_variables: []
+weights:
+  use_precomputed_weights: false
+  reweight_method: flat
+  reweight_vars:
+    label_sb0:
+    - -10000
+    - 100000
+    label_sb1:
+    - -10000
+    - 100000
+  reweight_classes:
+  - label_sb0
+  - label_sb1
+  - label_sb2
+  - label_sb3
+  - label_sb4
+  - label_sb5
+  - label_sb6
+  - label_sb7
+  - label_sb8
+  - label_sb9
+  - label_sb10
+  - label_sb11
+  - label_sb12
+  - label_sb13
+  - label_sb14
+  - label_sb15
+  class_weights:
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  reweight_hists:
+    label_sb0:
+    - - 0.043929729610681534
+    label_sb1:
+    - - 0.047767769545316696
+    label_sb2:
+    - - 0.05249267444014549
+    label_sb3:
+    - - 0.05805594101548195
+    label_sb4:
+    - - 0.06553024798631668
+    label_sb5:
+    - - 0.07475306838750839
+    label_sb6:
+    - - 0.08772526681423187
+    label_sb7:
+    - - 0.10725285112857819
+    label_sb8:
+    - - 0.1379512995481491
+    label_sb9:
+    - - 0.18098416924476624
+    label_sb10:
+    - - 0.23583321273326874
+    label_sb11:
+    - - 0.3091731369495392
+    label_sb12:
+    - - 0.40836310386657715
+    label_sb13:
+    - - 0.5222720503807068
+    label_sb14:
+    - - 0.6907413601875305
+    label_sb15:
+    - - 0.8999999761581421

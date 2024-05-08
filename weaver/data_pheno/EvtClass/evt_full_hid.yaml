@@ -1,0 +1,308 @@
+selection:
+   ### use `&`, `|`, `~` for logical operations on numpy arrays
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+
+new_variables:
+   ### [format] name: formula
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   evt_label_flat: ak.flatten(evt_label)
+   label_QCD:   (evt_label_flat == 0)
+   label_VJets: (evt_label_flat == 1)
+   label_TTbar: (evt_label_flat == 2)
+   label_H2B:   (evt_label_flat == 3)
+   label_2H4B:  (evt_label_flat == 4)
+   label_Wkk:   (evt_label_flat == 5)
+   # input vars
+   evt_ht_log: np.log(evt_ht)
+   evt_met_log: np.log(evt_met)
+   jet_pt_log: np.log(jet_pt)
+   jet_e_log: np.log(jet_e)
+   jet_sdmass_log: np.log(np.maximum(jet_sdmass, 1e-8))
+   lep_pt_log: np.log(lep_pt)
+   pho_pt_log: np.log(pho_pt)
+   lep_charge: np.sign(lep_pid)
+   lep_isel: (lep_pid == 11) | (lep_pid == -11)
+   lep_ismu: (lep_pid == 13) | (lep_pid == -13)
+   # masks
+   evt_mask: ak.ones_like(evt_ht)
+   jet_mask: ak.ones_like(jet_pt)
+   lep_mask: ak.ones_like(lep_pt)
+   pho_mask: ak.ones_like(pho_pt)
+   # four-vectors
+   jet_p4: _p4_from_ptetaphie(jet_pt, jet_eta, jet_phi, jet_e)
+   jet_px: jet_p4.px
+   jet_py: jet_p4.py
+   jet_pz: jet_p4.pz
+   lep_p4: _p4_from_ptetaphie(lep_pt, lep_eta, lep_phi, lep_e)
+   lep_px: lep_p4.px
+   lep_py: lep_p4.py
+   lep_pz: lep_p4.pz
+   pho_p4: _p4_from_ptetaphie(pho_pt, pho_eta, pho_phi, pho_e)
+   pho_px: pho_p4.px
+   pho_py: pho_p4.py
+   pho_pz: pho_p4.pz
+   evt_zeros: np.zeros_like(evt_met)
+   evt_met_t_p4: _p4_from_ptetaphie(evt_met, evt_zeros, evt_metphi, evt_met)
+   evt_met_t_px: evt_met_t_p4.px
+   evt_met_t_py: evt_met_t_p4.py
+   evt_met_t_pz: evt_met_t_p4.pz
+
+preprocess:
+  ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+  method: manual
+  ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+  data_fraction: 1.0
+
+inputs:
+   evt_features:
+      length: 2
+      pad_mode: wrap
+      vars:
+      ### [format 1]: var_name (no transformation)
+      ### [format 2]: [var_name,
+      ###              subtract_by(optional, default=None, no transf. if preprocess.method=manual, auto transf. if preprocess.method=auto),
+      ###              multiply_by(optional, default=1),
+      ###              clip_min(optional, default=-5),
+      ###              clip_max(optional, default=5),
+      ###              pad_value(optional, default=0)]
+         - [evt_ht_log, 7.5, 5]
+         - [evt_met_log, 4, 1]
+   evt_vectors:
+      length: 2
+      pad_mode: wrap
+      vars:
+         - [evt_met_t_px, null]
+         - [evt_met_t_py, null]
+         - [evt_met_t_pz, null]
+         - [evt_met, null]
+   evt_mask:
+      length: 2
+      pad_mode: constant
+      vars:
+         - evt_mask
+   
+   jet_features:
+      length: 10
+      pad_mode: wrap
+      vars:
+         - [jet_pt_log, 6.5, 2.5]
+         - [jet_eta, null]
+         - [jet_phi, null]
+         - [jet_e_log, 6.5, 2.5]
+         - [jet_sdmass_log, 3.5, 2]
+         - [jet_npar, 60, 0.05]
+         - [hid_0, null]
+         - [hid_1, null]
+         - [hid_2, null]
+         - [hid_3, null]
+         - [hid_4, null]
+         - [hid_5, null]
+         - [hid_6, null]
+         - [hid_7, null]
+         - [hid_8, null]
+         - [hid_9, null]
+         - [hid_10, null]
+         - [hid_11, null]
+         - [hid_12, null]
+         - [hid_13, null]
+         - [hid_14, null]
+         - [hid_15, null]
+         - [hid_16, null]
+         - [hid_17, null]
+         - [hid_18, null]
+         - [hid_19, null]
+         - [hid_20, null]
+         - [hid_21, null]
+         - [hid_22, null]
+         - [hid_23, null]
+         - [hid_24, null]
+         - [hid_25, null]
+         - [hid_26, null]
+         - [hid_27, null]
+         - [hid_28, null]
+         - [hid_29, null]
+         - [hid_30, null]
+         - [hid_31, null]
+         - [hid_32, null]
+         - [hid_33, null]
+         - [hid_34, null]
+         - [hid_35, null]
+         - [hid_36, null]
+         - [hid_37, null]
+         - [hid_38, null]
+         - [hid_39, null]
+         - [hid_40, null]
+         - [hid_41, null]
+         - [hid_42, null]
+         - [hid_43, null]
+         - [hid_44, null]
+         - [hid_45, null]
+         - [hid_46, null]
+         - [hid_47, null]
+         - [hid_48, null]
+         - [hid_49, null]
+         - [hid_50, null]
+         - [hid_51, null]
+         - [hid_52, null]
+         - [hid_53, null]
+         - [hid_54, null]
+         - [hid_55, null]
+         - [hid_56, null]
+         - [hid_57, null]
+         - [hid_58, null]
+         - [hid_59, null]
+         - [hid_60, null]
+         - [hid_61, null]
+         - [hid_62, null]
+         - [hid_63, null]
+         - [hid_64, null]
+         - [hid_65, null]
+         - [hid_66, null]
+         - [hid_67, null]
+         - [hid_68, null]
+         - [hid_69, null]
+         - [hid_70, null]
+         - [hid_71, null]
+         - [hid_72, null]
+         - [hid_73, null]
+         - [hid_74, null]
+         - [hid_75, null]
+         - [hid_76, null]
+         - [hid_77, null]
+         - [hid_78, null]
+         - [hid_79, null]
+         - [hid_80, null]
+         - [hid_81, null]
+         - [hid_82, null]
+         - [hid_83, null]
+         - [hid_84, null]
+         - [hid_85, null]
+         - [hid_86, null]
+         - [hid_87, null]
+         - [hid_88, null]
+         - [hid_89, null]
+         - [hid_90, null]
+         - [hid_91, null]
+         - [hid_92, null]
+         - [hid_93, null]
+         - [hid_94, null]
+         - [hid_95, null]
+         - [hid_96, null]
+         - [hid_97, null]
+         - [hid_98, null]
+         - [hid_99, null]
+         - [hid_100, null]
+         - [hid_101, null]
+         - [hid_102, null]
+         - [hid_103, null]
+         - [hid_104, null]
+         - [hid_105, null]
+         - [hid_106, null]
+         - [hid_107, null]
+         - [hid_108, null]
+         - [hid_109, null]
+         - [hid_110, null]
+         - [hid_111, null]
+         - [hid_112, null]
+         - [hid_113, null]
+         - [hid_114, null]
+         - [hid_115, null]
+         - [hid_116, null]
+         - [hid_117, null]
+         - [hid_118, null]
+         - [hid_119, null]
+         - [hid_120, null]
+         - [hid_121, null]
+         - [hid_122, null]
+         - [hid_123, null]
+         - [hid_124, null]
+         - [hid_125, null]
+         - [hid_126, null]
+         - [hid_127, null]
+
+   jet_vectors:
+      length: 10
+      pad_mode: wrap
+      vars:
+         - [jet_px, null]
+         - [jet_py, null]
+         - [jet_pz, null]
+         - [jet_e, null]
+   jet_mask:
+      length: 10
+      pad_mode: constant
+      vars:
+         - jet_mask
+
+   lep_features:
+      length: 5
+      pad_mode: wrap
+      vars:
+         - [lep_pt_log, 4, 1]
+         - [lep_eta, null]
+         - [lep_phi, null]
+         - [lep_charge, null]
+         - [lep_isel, null]
+         - [lep_iso_db, 0, 5]
+         - [lep_iso_rc, 0, 10]
+         - [lep_d0, 0, 5]
+         - [lep_d0_err, 0, 100]
+         - [lep_dz, 0, 0.01]
+         - [lep_dz_err, 0, 25]
+   lep_vectors:
+      length: 5
+      pad_mode: wrap
+      vars:
+         - [lep_px, null]
+         - [lep_py, null]
+         - [lep_pz, null]
+         - [lep_e, null]
+   lep_mask:
+      length: 5
+      pad_mode: constant
+      vars:
+         - lep_mask
+
+   pho_features:
+      length: 5
+      pad_mode: wrap
+      vars:
+         - [pho_pt_log, 4, 1]
+         - [pho_eta, null]
+         - [pho_phi, null]
+         - [pho_iso_db, 0, 5]
+         - [pho_iso_rc, 0, 10]
+         # - [pho_ehoe, null]
+         # - [pho_sumpt_c, null]
+         # - [pho_sumpt_n, null]
+         # - [pho_sumpt_c_pu, null]
+         # - [pho_sumpt, null]
+         # - [pho_status, null]
+   pho_vectors:
+      length: 5
+      pad_mode: wrap
+      vars:
+         - [pho_px, null]
+         - [pho_py, null]
+         - [pho_pz, null]
+         - [pho_e, null]
+   pho_mask:
+      length: 5
+      pad_mode: constant
+      vars:
+         - pho_mask
+
+labels:
+   ### type can be `simple`, `custom`
+   ### [option 1] use `simple` for binary/multi-class classification, then `value` is a list of 0-1 labels
+   type: simple
+   value: [label_QCD, label_VJets, label_TTbar, label_H2B, label_2H4B, label_Wkk]
+   ### [option 2] otherwise use `custom` to define the label, then `value` is a map
+   #type: custom
+   #value:
+   #   truth_label: evt_label
+
+observers:
+   evt_label
+
+weights:

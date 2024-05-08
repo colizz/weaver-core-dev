@@ -1,0 +1,121 @@
+selection:
+   ### use `&`, `|`, `~` for logical operations on numpy arrays
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   (jet_pt > 200) & (jet_pt < 2500) & (jet_sdmass > 20) & (jet_sdmass < 500) & ((jet_label == 0) | ((jet_label >= 164) & (jet_label < 191)))
+
+new_variables:
+   ### [format] name: formula
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   part_mask: ak.ones_like(part_energy)
+   part_pt: np.hypot(part_px, part_py)
+   part_pt_log: np.log(part_pt)
+   part_e_log: np.log(part_energy)
+   part_logptrel: np.log(part_pt/jet_pt)
+   part_logerel: np.log(part_energy/jet_energy)
+   part_deltaR: np.hypot(part_deta, part_dphi)
+   part_d0: np.tanh(part_d0val)
+   part_dz: np.tanh(part_dzval)
+   part_isElectron: (part_pid == 11) | (part_pid == -11)
+   part_isMuon: (part_pid == 13) | (part_pid == -13)
+   part_isPhoton: (part_pid == 22)
+   part_isChargedHadron: (part_charge != 0) & (~part_isElectron) & (~part_isMuon)
+   part_isNeutralHadron: (part_charge == 0) & (~part_isPhoton)
+
+   # classes for reweighting
+   label_H_bb: (jet_label == 0)
+   label_QCD: ((jet_label >= 164) & (jet_label < 191))
+
+
+preprocess:
+  ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+  method: manual
+  ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+  data_fraction: 0.5
+
+inputs:
+   pf_points:
+      length: 128
+      pad_mode: wrap
+      vars: 
+         - [part_deta, null]
+         - [part_dphi, null]
+   pf_features:
+      length: 128
+      pad_mode: wrap
+      vars: 
+      ### [format 1]: var_name (no transformation)
+      ### [format 2]: [var_name, 
+      ###              subtract_by(optional, default=None, no transf. if preprocess.method=manual, auto transf. if preprocess.method=auto), 
+      ###              multiply_by(optional, default=1), 
+      ###              clip_min(optional, default=-5), 
+      ###              clip_max(optional, default=5), 
+      ###              pad_value(optional, default=0)]
+         - [part_pt_log, 1.7, 0.7]
+         - [part_e_log, 2.0, 0.7]
+         - [part_logptrel, -4.7, 0.7]
+         - [part_logerel, -4.7, 0.7]
+         - [part_deltaR, 0.2, 4.0]
+         - [part_charge, null]
+         - [part_isChargedHadron, null]
+         - [part_isNeutralHadron, null]
+         - [part_isPhoton, null]
+         - [part_isElectron, null]
+         - [part_isMuon, null]
+         - [part_d0, null]
+         - [part_d0err, 0, 1, 0, 1]
+         - [part_dz, null]
+         - [part_dzerr, 0, 1, 0, 1]
+         - [part_deta, null]
+         - [part_dphi, null]
+   pf_vectors:
+      length: 128
+      pad_mode: wrap
+      vars: 
+         - [part_px, null]
+         - [part_py, null]
+         - [part_pz, null]
+         - [part_energy, null]
+   pf_mask:
+      length: 128
+      pad_mode: constant
+      vars: 
+         - [part_mask, null]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: simple
+    value: [label_H_bb, label_QCD]
+
+observers:
+   - jet_pt
+   - jet_eta
+   - jet_phi
+   - jet_energy
+   - jet_nparticles
+   - jet_sdmass
+   - jet_tau1
+   - jet_tau2
+   - jet_tau3
+   - jet_tau4
+
+weights:
+   ### [option 1] use precomputed weights stored in the input files
+   # use_precomputed_weights: true
+   # weight_branches: [weight, class_weight]
+   ### [option 2] compute weights on-the-fly using reweighting histograms
+   use_precomputed_weights: false
+   reweight_method: flat
+   reweight_vars:
+      jet_pt: [200, 240, 287, 344, 412, 493, 590, 707, 847, 1014, 1215, 1455, 1743, 2087, 2500]
+      jet_sdmass: [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310, 320, 330, 340, 350, 360, 370, 380, 390, 400, 410, 420, 430, 440, 450, 460, 470, 480, 490, 500]
+   reweight_classes:
+      [
+         label_H_bb,
+         label_QCD, 
+      ]
+   class_weights:
+      [
+         1,
+         1,
+      ]
+   reweight_hists:

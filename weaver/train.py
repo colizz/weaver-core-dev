@@ -18,7 +18,7 @@ from utils.import_tools import import_module
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--train-mode', type=str, default='cls',
-                    choices=['cls', 'regression', 'hybrid'],
+                    choices=['cls', 'regression', 'hybrid', 'custom'],
                     help='training mode')
 parser.add_argument('--train-mode-params', type=str, default='',
                     choices=['', 'metric:loss'],
@@ -28,6 +28,14 @@ parser.add_argument('--run-mode', type=str, default='default',
                     help='training mode')
 parser.add_argument('--early-stop', action='store_true', default=False,
                     help='Early stop training if the validation metric does not improve for a few epochs')
+parser.add_argument('--early-stop-dlr', type=float, default=5e-4,
+                    help='The delta loss for early stopping')
+parser.add_argument('--use-last-model', action='store_true', default=False,
+                    help='Simply take the last model as the best model')
+parser.add_argument('--extra-selection', type=str, default=None,
+                    help='Additional selection requirement, will modify `selection` to `(selection) & (extra)` on-the-fly')
+parser.add_argument('--seed', type=int, default=-1,
+                    help='Set seed for all torch, numpy utilities for reproducibility')
 parser.add_argument('-c', '--data-config', type=str, default='data/ak15_points_pf_sv_v0.yaml',
                     help='data config YAML file')
 parser.add_argument('-i', '--data-train', nargs='*', default=[],
@@ -96,7 +104,7 @@ parser.add_argument('--samples-per-epoch', type=int, default=None,
 parser.add_argument('--samples-per-epoch-val', type=int, default=None,
                     help='number of samples per epochs for validation; '
                          'if neither of `--steps-per-epoch-val` or `--samples-per-epoch-val` is set, each epoch will run over all loaded samples')
-parser.add_argument('--optimizer', type=str, default='ranger', choices=['adam', 'adamW', 'radam', 'ranger'],  # TODO: add more
+parser.add_argument('--optimizer', type=str, default='ranger', choices=['adam', 'adamW', 'radam', 'ranger', 'sgd'],  # TODO: add more
                     help='optimizer for the training')
 parser.add_argument('--optimizer-option', nargs=2, action='append', default=[],
                     help='options to pass to the optimizer class constructor, e.g., `--optimizer-option weight_decay 1e-4`')
@@ -234,6 +242,7 @@ def train_load(args):
         raise RuntimeError('Must set --steps-per-epoch when using --in-memory!')
 
     train_data = SimpleIterDataset(train_file_dict, args.data_config, for_training=True,
+                                   extra_selection=args.extra_selection,
                                    load_range_and_fraction=(train_range, args.data_fraction),
                                    file_fraction=args.file_fraction,
                                    fetch_by_files=args.fetch_by_files,
@@ -242,6 +251,7 @@ def train_load(args):
                                    in_memory=args.in_memory,
                                    name='train' + ('' if args.local_rank is None else '_rank%d' % args.local_rank))
     val_data = SimpleIterDataset(val_file_dict, args.data_config, for_training=True,
+                                 extra_selection=args.extra_selection,
                                  load_range_and_fraction=(val_range, args.data_fraction),
                                  file_fraction=args.file_fraction,
                                  fetch_by_files=args.fetch_by_files,
@@ -485,6 +495,8 @@ def optim(args, model, device):
         opt = torch.optim.AdamW(parameters, lr=args.start_lr, **optimizer_options)
     elif args.optimizer == 'radam':
         opt = torch.optim.RAdam(parameters, lr=args.start_lr, **optimizer_options)
+    elif args.optimizer == 'sgd':
+        opt = torch.optim.SGD(parameters, lr=args.start_lr, **optimizer_options)
 
     # load previous training and resume if `--load-epoch` is set
     if args.load_epoch is not None:
@@ -608,6 +620,76 @@ def model_setup(args, data_config):
                 state_dict[f'ft_mlp.0.0.bias'].copy_(model_state[f'part.fc.0.0.bias'].data)
                 state_dict[f'ft_mlp.1.weight'].copy_(model_state[f'part.fc.1.weight'].data[[314]])
                 state_dict[f'ft_mlp.1.bias'].copy_(model_state[f'part.fc.1.bias'].data[[314]])
+        elif args.load_model_weights.startswith('finetune_pheno.'):
+            model_state = torch.load(os.path.expanduser("~/hww/incl-train/weaver-core/weaver/model/JetClassII_ak8puppi_full_scale/net_best_epoch_state.pt"), map_location='cpu')
+            state_dict = model.state_dict()
+            print(state_dict.keys())
+            if args.load_model_weights == 'finetune_pheno.all': # take all layers after ft nodes
+                state_dict[f'ft_mlp.0.0.weight'].copy_(model_state[f'mod.fc.0.0.weight'].data)
+                state_dict[f'ft_mlp.0.0.bias'].copy_(model_state[f'mod.fc.0.0.bias'].data)
+                state_dict[f'ft_mlp.1.0.weight'].copy_(model_state[f'mod.fc.1.weight'].data)
+                state_dict[f'ft_mlp.1.0.bias'].copy_(model_state[f'mod.fc.1.bias'].data)
+            elif args.load_model_weights == 'finetune_pheno.0': # only takes the params 0-th layer after ft layer
+                state_dict[f'ft_mlp.0.0.weight'].copy_(model_state[f'mod.fc.0.0.weight'].data)
+                state_dict[f'ft_mlp.0.0.bias'].copy_(model_state[f'mod.fc.0.0.bias'].data)
+            elif (args.load_model_weights.startswith('finetune_pheno.ensemble.0') or args.load_model_weights.startswith('finetune_pheno.ensemble.all')) and 'wgtloss' not in args.load_model_weights: # for MLP ensembles
+                if args.load_model_weights.startswith('finetune_pheno.ensemble.all'):
+                    copy_targets = [
+                        ('mod.fc.0.0.weight', 'ft_mlp.0.0.weight'),
+                        ('mod.fc.0.0.bias', 'ft_mlp.0.0.bias'),
+                        ('mod.fc.1.weight', 'ft_mlp.1.0.weight'),
+                        ('mod.fc.1.bias', 'ft_mlp.1.0.bias'),
+                    ]
+                elif args.load_model_weights.startswith('finetune_pheno.ensemble.0'):
+                    copy_targets = [
+                        ('mod.fc.0.0.weight', 'ft_mlp.0.0.weight'),
+                        ('mod.fc.0.0.bias', 'ft_mlp.0.0.bias'),
+                    ]
+                for key in state_dict.keys():
+                    for mother_key, dau_match_key in copy_targets:
+                        if key.endswith(dau_match_key):
+                            state_dict[key].copy_(model_state[mother_key].data)
+                            print(f'Copy {mother_key} -> {key}')
+                if '+part' in args.load_model_weights:
+                    for key in model_state.keys():
+                        state_dict['part.'+key].copy_(model_state[key].data)
+                        print(f'Copy part model params: {key}')
+            elif args.load_model_weights.startswith('finetune_pheno.ensemble.0+wgtloss:'):
+                weight_model_path = args.load_model_weights.split(':')[-1]
+                weight_model_state = torch.load(weight_model_path, map_location='cpu')
+                copy_targets = [
+                    ('mod.fc.0.0.weight', 'ft_mlp.0.0.weight'),
+                    ('mod.fc.0.0.bias', 'ft_mlp.0.0.bias'),
+                ]
+                for key in state_dict.keys():
+                    if key.startswith('m_weight.'):
+                        state_dict[key].copy_(weight_model_state[key.replace('m_weight.', '')].data)
+                        print(f'Copy weight model params: {key}')
+                    elif key.startswith('m_main.'):
+                        for mother_key, dau_match_key in copy_targets:
+                            if key.endswith(dau_match_key):
+                                state_dict[key].copy_(model_state[mother_key].data)
+                                print(f'Copy main model params: {mother_key} -> {key}')
+                    else:
+                        raise ValueError(f'Unknown key: {key}')
+
+        elif args.load_model_weights.startswith('finetune_pheno_mergeQCD.'):
+            model_state = torch.load("/home/olympus/licq/hww/incl-train/weaver-core/weaver/model/JetClassII_ak8puppi_full_scale_mergeQCD/net_best_epoch_state.pt", map_location='cpu')
+            state_dict = model.state_dict()
+            if args.load_model_weights == 'finetune_pheno_mergeQCD.all': # take all layers after ft nodes
+                state_dict[f'ft_mlp.0.0.weight'].copy_(model_state[f'mod.fc.0.0.weight'].data)
+                state_dict[f'ft_mlp.0.0.bias'].copy_(model_state[f'mod.fc.0.0.bias'].data)
+                state_dict[f'ft_mlp.1.0.weight'].copy_(model_state[f'mod.fc.1.weight'].data)
+                state_dict[f'ft_mlp.1.0.bias'].copy_(model_state[f'mod.fc.1.bias'].data)
+        elif args.load_model_weights.startswith('wgtloss:'):
+            state_dict = model.state_dict()
+            weight_model_path = args.load_model_weights.split(':')[-1]
+            weight_model_state = torch.load(weight_model_path, map_location='cpu')
+            for key in state_dict.keys():
+                if key.startswith('m_weight.'):
+                    state_dict[key].copy_(weight_model_state[key.replace('m_weight.', '')].data)
+                    print(f'Copy weight model params: {key}')
+
         else:
             model_state = torch.load(args.load_model_weights, map_location='cpu')
             missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
@@ -732,6 +814,10 @@ def _main(args):
         _logger.info('Running in hybrid mode')
         from utils.nn.tools import train_hybrid as train
         from utils.nn.tools import evaluate_hybrid as evaluate
+    elif args.train_mode == 'custom':
+        _logger.info('Running in customised mode')
+        from utils.nn.tools import train_custom as train
+        from utils.nn.tools import evaluate_custom as evaluate
     else:
         _logger.info('Running in classification mode')
         from utils.nn.tools import train_classification as train
@@ -887,13 +973,20 @@ def _main(args):
             if args.early_stop:
                 assert args.run_mode == 'default'
                 # override the best_epoch behavier and break if the eval loss exceeds the training loss too much
-                assert (args.train_mode == 'cls' and args.train_mode_params == 'metric:loss')
+                if args.train_mode == 'cls':
+                    assert args.train_mode_params == 'metric:loss'
                 if args.model_prefix and (args.backend is None or local_rank == 0):
                     shutil.copy2(args.model_prefix + '_epoch-%d_state.pt' %
                                 epoch, args.model_prefix + '_best_epoch_state.pt')
-                if valid_metric - train_loss > 5e-4:
+                if valid_metric - train_loss > args.early_stop_dlr:
                     _logger.info('Early stop at epoch %d' % epoch)
                     break
+            
+            if args.use_last_model:
+                if args.model_prefix and (args.backend is None or local_rank == 0):
+                    shutil.copy2(args.model_prefix + '_epoch-%d_state.pt' %
+                                epoch, args.model_prefix + '_best_epoch_state.pt')
+
 
     if args.data_test:
         if args.backend is not None and local_rank != 0:
@@ -997,6 +1090,11 @@ def main():
         if args.local_rank != 0:
             stdout = None
     _configLogger('weaver', stdout=stdout, filename=args.log_file)
+
+    if args.seed != -1:
+        _logger.info('Setting random seed to %d' % args.seed)
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
 
     _main(args)
 

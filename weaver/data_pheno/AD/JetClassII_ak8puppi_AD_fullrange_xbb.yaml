@@ -1,0 +1,57 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `ak` in the expression
+
+selection: >-
+    (jet_sdmass >= 50) & (jet_sdmass < 300) & ((event_class <= 18) | (event_class == 19))
+
+### selection to apply at test time (i.e., when running w/ --predict)
+test_time_selection: >-
+    (jet_sdmass >= 50) & (jet_sdmass < 300) & ((event_class <= 18) | (event_class == 19))
+
+new_variables:
+    ### [format] name: formula
+    ### can use functions from `math`, `np` (numpy), and `ak` in the expression
+    # training categories
+    label_bin_idx: np.searchsorted([50.-1, 52.5, 55., 57.5, 60., 62.5, 65., 67.5, 70., 72.5, 75., 77.5, 80., 82.5, 85., 87.5, 90., 92.5, 95., 97.5, 100., 102.5, 105., 107.5, 110., 112.5, 115., 117.5, 120., 122.5, 125., 127.5, 130., 132.5, 135., 137.5, 140., 142.5, 145., 147.5, 150., 152.5, 155., 157.5, 160., 162.5, 165., 167.5, 170., 172.5, 175., 177.5, 180., 182.5, 185., 187.5, 190., 192.5, 195., 197.5, 200., 202.5, 205., 207.5, 210., 212.5, 215., 217.5, 220., 222.5, 225., 227.5, 230., 232.5, 235., 237.5, 240., 242.5, 245., 247.5, 250., 252.5, 255., 257.5, 260., 262.5, 265., 267.5, 270., 272.5, 275., 277.5, 280., 282.5, 285., 287.5, 290., 292.5, 295., 297.5], ak.to_numpy(jet_sdmass), side='right') - 1
+    label_all: jet_sdmass > 0
+
+preprocess:
+    ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+    method: manual
+    ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+    data_fraction:
+
+inputs:
+    ft_vars:
+        length: 128
+        pad_mode: constant
+        vars:
+            - [jet_hidneurons, null]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: simple
+    value: null
+    value_cls_index: label_bin_idx  # just input the label index
+    value_cls_names: [label_bin_0, label_bin_1, label_bin_2, label_bin_3, label_bin_4, label_bin_5, label_bin_6, label_bin_7, label_bin_8, label_bin_9, label_bin_10, label_bin_11, label_bin_12, label_bin_13, label_bin_14, label_bin_15, label_bin_16, label_bin_17, label_bin_18, label_bin_19, label_bin_20, label_bin_21, label_bin_22, label_bin_23, label_bin_24, label_bin_25, label_bin_26, label_bin_27, label_bin_28, label_bin_29, label_bin_30, label_bin_31, label_bin_32, label_bin_33, label_bin_34, label_bin_35, label_bin_36, label_bin_37, label_bin_38, label_bin_39, label_bin_40, label_bin_41, label_bin_42, label_bin_43, label_bin_44, label_bin_45, label_bin_46, label_bin_47, label_bin_48, label_bin_49, label_bin_50, label_bin_51, label_bin_52, label_bin_53, label_bin_54, label_bin_55, label_bin_56, label_bin_57, label_bin_58, label_bin_59, label_bin_60, label_bin_61, label_bin_62, label_bin_63, label_bin_64, label_bin_65, label_bin_66, label_bin_67, label_bin_68, label_bin_69, label_bin_70, label_bin_71, label_bin_72, label_bin_73, label_bin_74, label_bin_75, label_bin_76, label_bin_77, label_bin_78, label_bin_79, label_bin_80, label_bin_81, label_bin_82, label_bin_83, label_bin_84, label_bin_85, label_bin_86, label_bin_87, label_bin_88, label_bin_89, label_bin_90, label_bin_91, label_bin_92, label_bin_93, label_bin_94, label_bin_95, label_bin_96, label_bin_97, label_bin_98, label_bin_99]
+
+
+observers:
+    - event_no
+    - event_class
+    - jet_sdmass
+
+weights:
+   ### [option 1] use precomputed weights stored in the input files
+   # use_precomputed_weights: true
+   # weight_branches: [weight, class_weight]
+   ### [option 2] compute weights on-the-fly using reweighting histograms
+   use_precomputed_weights: false
+   reweight_method: flat
+   reweight_vars:
+      jet_pt: [0, 100000]
+      jet_sdmass: [50., 52.5, 55., 57.5, 60., 62.5, 65., 67.5, 70., 72.5, 75., 77.5, 80., 82.5, 85., 87.5, 90., 92.5, 95., 97.5, 100., 102.5, 105., 107.5, 110., 112.5, 115., 117.5, 120., 122.5, 125., 127.5, 130., 132.5, 135., 137.5, 140., 142.5, 145., 147.5, 150., 152.5, 155., 157.5, 160., 162.5, 165., 167.5, 170., 172.5, 175., 177.5, 180., 182.5, 185., 187.5, 190., 192.5, 195., 197.5, 200., 202.5, 205., 207.5, 210., 212.5, 215., 217.5, 220., 222.5, 225., 227.5, 230., 232.5, 235., 237.5, 240., 242.5, 245., 247.5, 250., 252.5, 255., 257.5, 260., 262.5, 265., 267.5, 270., 272.5, 275., 277.5, 280., 282.5, 285., 287.5, 290., 292.5, 295., 297.5, 300.]
+   reweight_classes: [label_all]
+   class_weights: [1.]
+   reweight_threshold: 0
+   reweight_hists:
