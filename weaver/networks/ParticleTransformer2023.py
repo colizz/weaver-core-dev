@@ -430,7 +430,8 @@ class Block(nn.Module):
         if x_cls is not None:
             with torch.no_grad():
                 # prepend one element for x_cls: -> (batch, 1+seq_len)
-                padding_mask = torch.cat((torch.zeros_like(padding_mask[:, :1]), padding_mask), dim=1)
+                num_cls_token = x_cls.size(0)
+                padding_mask = torch.cat((torch.zeros_like(padding_mask[:, :num_cls_token]), padding_mask), dim=1)
             # class attention: https://arxiv.org/pdf/2103.17239.pdf
             residual = x_cls
             u = torch.cat((x_cls, x), dim=0)  # (seq_len+1, batch, embed_dim)
@@ -483,6 +484,7 @@ class ParticleTransformer(nn.Module):
                  num_heads=8,
                  num_layers=8,
                  num_cls_layers=2,
+                 num_cls_tokens=1,
                  block_params=None,
                  cls_block_params={'dropout': 0, 'attn_dropout': 0, 'activation_dropout': 0},
                  fc_params=[],
@@ -544,7 +546,8 @@ class ParticleTransformer(nn.Module):
             self.fc = None
 
         # init
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim), requires_grad=True)
+        self.num_cls_tokens = num_cls_tokens
+        self.cls_token = nn.Parameter(torch.zeros(num_cls_tokens, 1, embed_dim), requires_grad=True)
         trunc_normal_(self.cls_token, std=.02)
 
     @torch.jit.ignore
@@ -577,11 +580,12 @@ class ParticleTransformer(nn.Module):
                 x = block(x, x_cls=None, padding_mask=padding_mask, attn_mask=attn_mask)
 
             # extract class token
-            cls_tokens = self.cls_token.expand(1, x.size(1), -1)  # (1, N, C)
+            cls_tokens = self.cls_token.expand(self.num_cls_tokens, x.size(1), -1)  # (N_cls_token, N, C)
             for block in self.cls_blocks:
                 cls_tokens = block(x, x_cls=cls_tokens, padding_mask=padding_mask)
 
-            x_cls = self.norm(cls_tokens).squeeze(0)
+            cls_tokens = self.norm(cls_tokens) # (N_cls_token, N, C)
+            x_cls = cls_tokens[0] # (N, C), only use the first cls token
 
             # fc
             if self.fc is None:
@@ -601,7 +605,7 @@ class ParticleTransformer(nn.Module):
             if self.return_embed == False:
                 return output
             else:
-                return output, x_cls
+                return output, cls_tokens
 
 
 class ParticleTransformerTagger(nn.Module):

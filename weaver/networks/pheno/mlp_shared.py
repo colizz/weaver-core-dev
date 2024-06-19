@@ -91,8 +91,13 @@ class MLPWeightSharing(nn.Module):
         assert self.merge_after_nth_layer is not None
 
     def forward(self, *x):
-        # x[0]: ft vars in 2D branch, dim: (N, 2, C)
-        x_ft = x[0]
+        if len(x[0].shape) == 3:
+            # x[0]: ft vars in 2D branch, dim: (N, 2, C)
+            x_ft = x[0]
+        else:
+            # x[0]: ft vars in dim: (N, C) -> should convert to (N, 2, C/2)
+            x_ft = x[0].view(x[0].shape[0], 2, -1)
+
         x_ft = apply_seq(self.ft_mlp[:(self.merge_after_nth_layer+1)], x_ft)
         x_ft = x_ft.mean(dim=1)
         return apply_seq(self.ft_mlp[(self.merge_after_nth_layer+1):], x_ft)
@@ -105,7 +110,13 @@ def get_model(data_config, **kwargs):
     num_ensemble = kwargs.pop('num_ensemble', None)
     cfg.update(**kwargs)
     print(cfg)
-    ft_dims = data_config.input_shapes['ft_vars'][-1] # ft vars are given as a single 2D branch
+    if len(data_config.input_shapes['ft_vars']) == 3 and isinstance(data_config.input_shapes['ft_vars'][-1], int):
+        ft_dims = data_config.input_shapes['ft_vars'][-1] # ft vars are given as a compact 2D branch
+    elif len(data_config.input_shapes['ft_vars']) == 2 or data_config.input_shapes['ft_vars'][-1] == None:
+        assert data_config.input_shapes['ft_vars'][1] % 2 == 0
+        ft_dims = data_config.input_shapes['ft_vars'][1] // 2
+    else:
+        raise ValueError(f"Unexpected input shape for ft_vars: {data_config.input_shapes['ft_vars']}")
 
     num_classes = 2
 

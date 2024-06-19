@@ -312,7 +312,8 @@ def test_load(args):
         num_workers = min(args.num_workers, len(filelist))
         test_data = SimpleIterDataset({name: filelist}, args.data_config, for_training=False,
                                       load_range_and_fraction=(tuple(args.test_range), args.data_fraction),
-                                      fetch_by_files=True, fetch_step=1,
+                                    #   fetch_by_files=True, fetch_step=1,
+                                      fetch_by_files=False, fetch_step=0.01,
                                       name='test_' + name)
         test_loader = DataLoader(test_data, num_workers=num_workers, batch_size=args.batch_size, drop_last=False,
                                  pin_memory=True)

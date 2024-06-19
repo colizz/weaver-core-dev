@@ -621,6 +621,81 @@ python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
 --log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/test.log \
 --predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
 
+### add experiment: trained on 28% of total dataset? 40.2/(40.2+99.2)
+
+PREFIX=JetClassII_ak8puppi_full_scale.data0p28.smallspe
+config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}.yaml
+DATAFILE_MOD='/mldata/licq/datasets/JetClassII/train_higgs2p_ntuple/*[0-4].root /mldata/licq/datasets/JetClassII/train_higgspm2p_ntuple/*[0-4].root /mldata/licq/datasets/JetClassII/train_higgs4p_ntuple/*[0-4].root /mldata/licq/datasets/JetClassII/train_qcd_ntuple/*[0-4].root'
+DATAFILE='/mldata/licq/datasets/JetClassII/train_higgs2p_ntuple/*.root /mldata/licq/datasets/JetClassII/train_higgspm2p_ntuple/*.root /mldata/licq/datasets/JetClassII/train_higgs4p_ntuple/*.root /mldata/licq/datasets/JetClassII/train_qcd_ntuple/*.root'
+NGPUS=4
+
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
+$HOME/hww/incl-train/weaver-core/weaver/train.py --run-mode train-only \
+--extra-selection "(ak.values_astype(np.tan(jet_energy) * 100000, 'int') % 50 < 28)" \
+--use-amp -o fc_params '[(512,0.1)]' \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.01 \
+--backend nccl --data-train $DATAFILE_MOD \
+--samples-per-epoch $((2500 * 1024 / $NGPUS)) --samples-per-epoch-val $((2500 * 1024)) \
+--data-config ${config} --num-workers 6 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --run-mode val-only \
+--use-amp -o fc_params '[(512,0.1)]' \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.01 \
+--gpus 3 --data-train $DATAFILE_MOD \
+--samples-per-epoch $((2500 * 1024 / $NGPUS)) --samples-per-epoch-val $((2500 * 1024)) \
+--data-config ${config} --num-workers 8 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/val.log --tensorboard _${PREFIX} --load-epoch 49
+
+// infer sm samples
+config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}_sminfer.yaml ## use the special infer dataset
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
+--use-amp -o fc_params '[(512,0.1)]' \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.01 \
+--gpus 0 \
+--data-test \
+'mixed_ntuple_1:/mldata/licq/datasets/JetClassII/mixed_ntuple/ntuples_*[13579].root' \
+'mixed_xbbbs_ntuple:/mldata/licq/datasets/JetClassII/mixed_xbbbs_ntuple/ntuples_*.root' \
+--data-config ${config} --num-workers 10 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+### publish JetClass-II: final check
+
+PREFIX=JetClassII_ak8puppi_full_scale
+config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}.yaml
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
+--use-amp -o fc_params '[(512,0.1)]' \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.008 \
+--gpus 0 \
+--data-test 'publish_test_QCD:/mldata/licq/datasets/JetClassII/train_qcd_ntuple/ntuples_0.root' \
+--samples-per-epoch $((10000 * 1024)) --samples-per-epoch-val $((1000 * 1024)) \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+PREFIX=JetClassIIformal_ak8puppi_full_scale
+config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}.yaml
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
+--use-amp -o fc_params '[(512,0.1)]' \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.008 \
+--gpus 0 \
+--data-test 'publish_test_QCD:/home/olympus/licq/QCDtest/*.root' \
+--samples-per-epoch $((10000 * 1024)) --samples-per-epoch-val $((1000 * 1024)) \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/JetClassII_ak8puppi_full_scale/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/JetClassII_ak8puppi_full_scale/pred_JetClassIIformal.root
+
 ## 24.03.06 final hbb and hbs training, w/ weight decay
 
 PREFIX=JetClassII_ak8puppi_full_hbbonly.wd0p01
@@ -834,13 +909,30 @@ python $HOME/hww/incl-train/weaver-core/weaver/train.py \
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
 --log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
 
+// second attempt
+PREFIX=JetClassII_ak8puppi_full_hbsonly.data200fs.512-64.part-ft
+config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}.yaml
+DATAFILE='/mldata/licq/datasets/JetClassII/train_hbs_ntuple/*.root /mldata/licq/datasets/JetClassII/train_qcd_ntuple/*.root'
+NGPUS=1
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py \
+-o part_fc_params '[(512,0.1)]' -o ft_layer_params '[(512,0.0),(64,0.0)]' --load-model-weights finetune_pheno.ensemble.0+part \
+--batch-size 1024 --start-lr 5e-4 --num-epochs 10 --lr-scheduler one-cycle --optimizer ranger --fetch-step 0.01 \
+--gpus 0 --data-train $DATAFILE \
+--samples-per-epoch $((250 * 1024 / $NGPUS)) --samples-per-epoch-val $((250 * 1024)) \
+--data-config ${config} --num-workers 24 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/pheno/mlp_ft.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
+
+
 // infer sm
 config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}_sminfer.yaml ## use the special infer dataset
 
 python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
--o part_fc_params '[(512,0.1)]' -o ft_layer_params '[(512,0.0),(2048,0.0)]' --load-model-weights finetune_pheno.ensemble.0+part \
+-o part_fc_params '[(512,0.1)]' -o ft_layer_params '[(512,0.0),(64,0.0)]' --load-model-weights finetune_pheno.ensemble.0+part \
 --batch-size 1024 --start-lr 5e-4 --num-epochs 10 --lr-scheduler one-cycle --optimizer ranger --fetch-step 0.01 \
---gpus 3 \
+--gpus 0 \
 --data-test \
 'mixed_qcdlt0p1_sig10k_ntuple_merged_1:/mldata/licq/datasets/JetClassII/mixed_qcdlt0p1_sig10k_ntuple_merged_1.root' \
 'mixed_ntuple_1:/mldata/licq/datasets/JetClassII/mixed_ntuple/ntuples_*[13579].root' \
@@ -849,6 +941,8 @@ python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
 --network-config $HOME/hww/incl-train/weaver-core/weaver/networks/pheno/mlp_ft.py \
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
 --predict-output $HOME/hww/incl-train/weaver-core/weaver/predict/$PREFIX/pred.root
+
+
 
 ------------------------------------------------------------------------------------
 # 24.02.07 Starting AD (wrong!!)
@@ -1948,7 +2042,7 @@ python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom \
 
 ## IAD for low-level features
 NEVT=20000; ## 8sigma
-PREFIX=Wkk_IAD_lolv.nevt${NEVT} network_name=pheno/example_ParticleTransformer2023Dijet; ext_opt='--start-lr 1e-3 --num-epochs 50 --lr-scheduler none --samples-per-epoch 100000 --samples-per-epoch-val 100000 --batch-size 200 --train-mode-params metric:loss --use-last-model --tensorboard-custom-fn ../tensorboard_fn/JetClassII_dijet_AD_ensemble.py';
+PREFIX=Wkk_IAD_lolv.nevt${NEVT} network_name=pheno/example_ParticleTransformer2023Dijet; ext_opt='--start-lr 1e-3 --num-epochs 500 --lr-scheduler none --samples-per-epoch 100000 --samples-per-epoch-val 100000 --batch-size 200 --train-mode-params metric:loss --use-last-model';
 
 config="$HOME/hww/incl-train/weaver-core/weaver/data_pheno/AD_dijet/${PREFIX%%.*}.yaml";
 rm -rf $HOME/hww/incl-train/weaver-core/weaver/data_pheno/AD_dijet/${PREFIX%%.*}.*auto*.yaml
@@ -1969,7 +2063,87 @@ python $HOME/hww/incl-train/weaver-core/weaver/train.py \
 --network-config $HOME/hww/incl-train/weaver-core/weaver/networks/$network_name.py \
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/anomdet/model/${PREFIX}/net \
 --predict-output $HOME/hww/incl-train/weaver-core/weaver/anomdet/predict/$PREFIX/pred.root \
---log $HOME/hww/incl-train/weaver-core/weaver/anomdet/logs/${PREFIX}/train_{auto}.log --tensorboard _${PREFIX}_{auto} --samples-per-epoch 200 --samples-per-epoch-val 200
+--log $HOME/hww/incl-train/weaver-core/weaver/anomdet/logs/${PREFIX}/train_{auto}.log --tensorboard _${PREFIX}_{auto}
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
+--use-amp --optimizer-option weight_decay 0.01 \
+--samples-per-epoch $((10 * 50000)) --samples-per-epoch-val $((10 * 50000)) \
+--optimizer ranger ${ext_opt} \
+--gpus $GPU --fetch-step 0.01 \
+--data-test $DATAFILE_EVAL \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/$network_name.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/anomdet/model/${PREFIX}/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/anomdet/predict/$PREFIX/pred.root
+
+## Fully supervised for low level
+PREFIX=Wkk_sup_lolv.flatdecay network_name=pheno/example_ParticleTransformer2023Dijet; ext_opt='--start-lr 1e-3 --num-epochs 50 --lr-scheduler flat+decay --samples-per-epoch 100000 --samples-per-epoch-val 100000 --batch-size 200 --train-mode-params metric:loss --use-last-model';
+
+config="$HOME/hww/incl-train/weaver-core/weaver/data_pheno/AD_dijet/${PREFIX%%.*}.yaml";
+rm -rf $HOME/hww/incl-train/weaver-core/weaver/data_pheno/AD_dijet/${PREFIX%%.*}.*auto*.yaml
+
+DATAFILE_TRAIN="/mldata/licq/datasets/JetClassII/sm_dijet/mixed_dijet_passsel_ntuple_merged_40ifb_part0.root /mldata/licq/datasets/JetClassII/sm_dijet/mixed_wkk_passsel_ntuple/ntuples_0.root";
+GPU=3
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py \
+--use-amp --optimizer-option weight_decay 0.01 \
+--samples-per-epoch $((10 * 50000)) --samples-per-epoch-val $((10 * 50000)) \
+--optimizer ranger ${ext_opt} \
+--gpus $GPU --fetch-step 0.01 \
+--data-train $DATAFILE_TRAIN \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/$network_name.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/anomdet/model/${PREFIX}/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/anomdet/predict/$PREFIX/pred.root \
+--log $HOME/hww/incl-train/weaver-core/weaver/anomdet/logs/${PREFIX}/train_{auto}.log --tensorboard _${PREFIX}_{auto}
+
+## IAD for high level
+
+NEVT=10000
+# PREFIX=Wkk_IAD_hilv.ensem20.onemlp.64-64-64.flat.nevt${NEVT} network_name=pheno/mlp; ext_opt='-o num_ensemble 20 -o ft_layer_params [(64,0.0),(64,0.0),(64,0.0)] --start-lr 1e-3 --num-epochs 10 --lr-scheduler none --samples-per-epoch 500000 --samples-per-epoch-val 500000 --batch-size 10000 --train-mode-params metric:loss --use-last-model --tensorboard-custom-fn ../tensorboard_fn/JetClassII_dijet_AD_ensemble.py';
+# PREFIX=Wkk_IAD_hilv.ensem20.64-64-64.flatdecay.nevt${NEVT} network_name=pheno/mlp_shared; ext_opt='-o num_ensemble 20 -o ft_layer_params [(64,0.0),(64,0.0),(64,0.0)] -o merge_after_nth_layer 1 --start-lr 1e-3 --num-epochs 20 --lr-scheduler flat+decay --samples-per-epoch 250000 --samples-per-epoch-val 250000 --batch-size 10000 --train-mode-params metric:loss --use-last-model --tensorboard-custom-fn ../tensorboard_fn/JetClassII_dijet_AD_ensemble.py';
+PREFIX=Wkk_IAD_hilv.ensem20.512-128-128.flatdecay.nevt${NEVT} network_name=pheno/mlp_shared; ext_opt='-o num_ensemble 20 -o ft_layer_params [(512,0.0),(128,0.0),(128,0.0)] -o merge_after_nth_layer 1 --start-lr 1e-3 --num-epochs 20 --lr-scheduler flat+decay --samples-per-epoch 250000 --samples-per-epoch-val 250000 --batch-size 10000 --train-mode-params metric:loss --use-last-model --tensorboard-custom-fn ../tensorboard_fn/JetClassII_dijet_AD_ensemble.py';
+
+config="$HOME/hww/incl-train/weaver-core/weaver/data_pheno/AD_dijet/${PREFIX%%.*}.yaml";
+rm -rf $HOME/hww/incl-train/weaver-core/weaver/data_pheno/AD_dijet/${PREFIX%%.*}.*auto*.yaml
+
+DATAFILE_TRAIN="/mldata/licq/datasets/JetClassII/sm_dijet/mixed_dijet_passsel_ntuple_merged_40ifb_part0.root";
+DATAFILE_EVAL="/mldata/licq/datasets/JetClassII/sm_dijet/mixed_dijet_passsel_ntuple_merged_40ifb_part1.root";
+GPU=2
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom --seed 42 \
+--extra-selection "((event_class <= 18) | ((event_class == 21) & (event_no % 1000 < ($NEVT / 50))) )" \
+--samples-per-epoch $((10 * 50000)) --samples-per-epoch-val $((10 * 50000)) \
+--optimizer ranger ${ext_opt} \
+--gpus $GPU --fetch-step 1 --in-memory \
+--data-train $DATAFILE_TRAIN \
+--data-val $DATAFILE_EVAL \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/$network_name.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/anomdet/model/${PREFIX}/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/anomdet/predict/$PREFIX/pred.root \
+--log $HOME/hww/incl-train/weaver-core/weaver/anomdet/logs/${PREFIX}/train_{auto}.log --tensorboard _${PREFIX}_{auto};
+
+## supervised for high-level
+PREFIX=Wkk_sup_hilv.ensem20.512-128-128.flatdecay network_name=pheno/mlp_shared; ext_opt='-o num_ensemble 20 -o ft_layer_params [(512,0.0),(128,0.0),(128,0.0)] -o merge_after_nth_layer 1 --start-lr 1e-3 --num-epochs 20 --lr-scheduler flat+decay --samples-per-epoch 250000 --samples-per-epoch-val 250000 --batch-size 10000 --train-mode-params metric:loss --use-last-model --tensorboard-custom-fn ../tensorboard_fn/JetClassII_dijet_AD_ensemble.py';
+
+config="$HOME/hww/incl-train/weaver-core/weaver/data_pheno/AD_dijet/${PREFIX%%.*}.yaml";
+rm -rf $HOME/hww/incl-train/weaver-core/weaver/data_pheno/AD_dijet/${PREFIX%%.*}.*auto*.yaml
+
+DATAFILE_TRAIN="/mldata/licq/datasets/JetClassII/sm_dijet/mixed_dijet_passsel_ntuple_merged_40ifb_part0.root /mldata/licq/datasets/JetClassII/sm_dijet/mixed_wkk_passsel_ntuple/ntuples_0.root";
+GPU=3
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom --seed 42 \
+--samples-per-epoch $((10 * 50000)) --samples-per-epoch-val $((10 * 50000)) \
+--optimizer ranger ${ext_opt} \
+--gpus $GPU --fetch-step 1 --in-memory \
+--data-train $DATAFILE_TRAIN \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/$network_name.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/anomdet/model/${PREFIX}/net \
+--predict-output $HOME/hww/incl-train/weaver-core/weaver/anomdet/predict/$PREFIX/pred.root \
+--log $HOME/hww/incl-train/weaver-core/weaver/anomdet/logs/${PREFIX}/train_{auto}.log --tensorboard _${PREFIX}_{auto};
+
 
 # 24.05.04 finally: to full spectrum AD
 
@@ -2005,3 +2179,32 @@ PREFIX=${PREFIX/step1/step2}.ensem100.512-64.loadffn0-lrmult1 network_name=pheno
 config="$HOME/hww/incl-train/weaver-core/weaver/data_pheno/AD_fullspec/${PREFIX%%.*}.yaml";
 
 run_weaver
+
+# 23.07 pheno2: try CLIP
+
+PREFIX=JetClassII_ak8puppi_full_scale_CLIP
+config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}.yaml
+DATAFILE_MOD='/mldata/licq/datasets/JetClassII/train_higgs2p_ntuple/*[0-4].root /mldata/licq/datasets/JetClassII/train_higgspm2p_ntuple/*[0-4].root /mldata/licq/datasets/JetClassII/train_higgs4p_ntuple/*[0-4].root /mldata/licq/datasets/JetClassII/train_qcd_ntuple/*[0-4].root'
+DATAFILE='/mldata/licq/datasets/JetClassII/train_higgs2p_ntuple/*.root /mldata/licq/datasets/JetClassII/train_higgspm2p_ntuple/*.root /mldata/licq/datasets/JetClassII/train_higgs4p_ntuple/*.root /mldata/licq/datasets/JetClassII/train_qcd_ntuple/*.root'
+NGPUS=4
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom \
+--use-amp \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.01 \
+--gpus 3 --data-train $DATAFILE_MOD \
+--samples-per-epoch $((10000 * 1024 / $NGPUS)) --samples-per-epoch-val $((2500 * 1024)) \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/pheno/example_ParticleTransformer2023_CLIP.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
+
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
+$HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom --run-mode train-only \
+--use-amp \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.01 \
+--backend nccl --data-train $DATAFILE_MOD \
+--samples-per-epoch $((2500 * 1024 / $NGPUS)) --samples-per-epoch-val $((2500 * 1024)) \
+--data-config ${config} --num-workers 6 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/pheno/example_ParticleTransformer2023_CLIP.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}

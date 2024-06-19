@@ -1,0 +1,167 @@
+selection:
+   ### use `&`, `|`, `~` for logical operations on numpy arrays
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   (jet_pt > 200) & (jet_pt < 2500) & (jet_sdmass > 20) & (jet_sdmass < 500)
+
+new_variables:
+   ### [format] name: formula
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   part_mask: ak.ones_like(part_energy)
+
+   ## first calculating scaled vectors
+   part_px_scale: part_px / jet_pt * 500
+   part_py_scale: part_py / jet_pt * 500
+   part_pz_scale: part_pz / jet_pt * 500
+   part_energy_scale: part_energy / jet_pt * 500
+
+   part_pt: np.hypot(part_px, part_py)
+   part_pt_scale: np.hypot(part_px_scale, part_py_scale)
+   part_pt_scale_log: np.log(part_pt_scale)
+   part_e_scale_log: np.log(part_energy_scale)
+   part_logptrel: np.log(part_pt/jet_pt)
+   part_logerel: np.log(part_energy/jet_energy)
+   part_deltaR: np.hypot(part_deta, part_dphi)
+   part_d0: np.tanh(part_d0val)
+   part_dz: np.tanh(part_dzval)
+
+   # classes for reweighting
+   label_H_QQ: ((jet_label >= 0) & (jet_label < 9))
+   label_H_gg: (jet_label == 9)
+   label_H_ll: ((jet_label >= 10) & (jet_label < 12))
+   label_H_tauhtaul: ((jet_label >= 12) & (jet_label < 14))
+   label_H_tauhtauh: (jet_label == 14)
+
+   label_H_AA_QQQQ: (((jet_label >= 15) & (jet_label < 19)) | ((jet_label >= 32) & (jet_label < 35)) | ((jet_label >= 48) & (jet_label < 50)) | (jet_label == 63) | ((jet_label >= 115) & (jet_label < 127)))
+   label_H_AA_QQgg: ((jet_label == 19) | (jet_label == 35) | (jet_label == 50) | (jet_label == 64))
+   label_H_AA_gggg: (jet_label == 77)
+   label_H_AA_QQQ: (((jet_label >= 25) & (jet_label < 29)) | ((jet_label >= 41) & (jet_label < 45)) | ((jet_label >= 56) & (jet_label < 60)) | ((jet_label >= 70) & (jet_label < 74)) | ((jet_label >= 127) & (jet_label < 131)))
+   label_H_AA_QQg: ((jet_label == 29) | (jet_label == 45) | (jet_label == 60) | (jet_label == 74))
+   label_H_AA_Qgg: ((jet_label >= 83) & (jet_label < 87))
+   label_H_AA_ggg: (jet_label == 87)
+
+   label_H_AA_QQll: (((jet_label >= 20) & (jet_label < 22)) | ((jet_label >= 36) & (jet_label < 38)) | ((jet_label >= 51) & (jet_label < 53)) | ((jet_label >= 65) & (jet_label < 67)))
+   label_H_AA_QQl: (((jet_label >= 30) & (jet_label < 32)) | ((jet_label >= 46) & (jet_label < 48)) | ((jet_label >= 61) & (jet_label < 63)) | ((jet_label >= 75) & (jet_label < 77)))
+   label_H_AA_Qll: (((jet_label >= 90) & (jet_label < 94)) | ((jet_label >= 95) & (jet_label < 99)))
+   label_H_AA_QQtauhtaul: (((jet_label >= 22) & (jet_label < 24)) | ((jet_label >= 38) & (jet_label < 40)) | ((jet_label >= 53) & (jet_label < 55)) | ((jet_label >= 67) & (jet_label < 69)))
+   label_H_AA_QQtauhtauh: ((jet_label == 24) | (jet_label == 40) | (jet_label == 55) | (jet_label == 69))
+   label_H_AA_Qtauhtaul: (((jet_label >= 100) & (jet_label < 104)) | ((jet_label >= 105) & (jet_label < 109)))
+   label_H_AA_Qtauhtauh: ((jet_label >= 110) & (jet_label < 114))
+   label_H_AA_ggll: ((jet_label >= 78) & (jet_label < 80))
+   label_H_AA_ggl: ((jet_label >= 88) & (jet_label < 90))
+   label_H_AA_gll: ((jet_label == 94) | (jet_label == 99))
+   label_H_AA_ggtauhtaul: ((jet_label >= 80) & (jet_label < 82))
+   label_H_AA_ggtauhtauh: (jet_label == 82)
+   label_H_AA_gtauhtaul: ((jet_label == 104) | (jet_label == 109))
+   label_H_AA_gtauhtauh: (jet_label == 114)
+
+   label_H_AA_QQlv: ((jet_label >= 131) & (jet_label < 143))
+   label_H_AA_QQtaulv: ((jet_label >= 143) & (jet_label < 155))
+   label_H_AA_QQtauhv: ((jet_label >= 155) & (jet_label < 161))
+
+   label_QCD: ((jet_label >= 161) & (jet_label < 188))
+
+
+preprocess:
+  ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+  method: manual
+  ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+  data_fraction: 0.5
+
+inputs:
+   pf_points:
+      length: 128
+      pad_mode: wrap
+      vars: 
+         - [part_deta, null]
+         - [part_dphi, null]
+   pf_features:
+      length: 128
+      pad_mode: wrap
+      vars: 
+      ### [format 1]: var_name (no transformation)
+      ### [format 2]: [var_name, 
+      ###              subtract_by(optional, default=None, no transf. if preprocess.method=manual, auto transf. if preprocess.method=auto), 
+      ###              multiply_by(optional, default=1), 
+      ###              clip_min(optional, default=-5), 
+      ###              clip_max(optional, default=5), 
+      ###              pad_value(optional, default=0)]
+         - [part_pt_scale_log, 1.7, 0.7]
+         - [part_e_scale_log, 2.0, 0.7]
+         - [part_logptrel, -4.7, 0.7]
+         - [part_logerel, -4.7, 0.7]
+         - [part_deltaR, 0.2, 4.0]
+         - [part_charge, null]
+         - [part_isChargedHadron, null]
+         - [part_isNeutralHadron, null]
+         - [part_isPhoton, null]
+         - [part_isElectron, null]
+         - [part_isMuon, null]
+         - [part_d0, null]
+         - [part_d0err, 0, 1, 0, 1]
+         - [part_dz, null]
+         - [part_dzerr, 0, 1, 0, 1]
+         - [part_deta, null]
+         - [part_dphi, null]
+   pf_vectors:
+      length: 128
+      pad_mode: wrap
+      vars: 
+         - [part_px_scale, null]
+         - [part_py_scale, null]
+         - [part_pz_scale, null]
+         - [part_energy_scale, null]
+   pf_mask:
+      length: 128
+      pad_mode: constant
+      vars: 
+         - [part_mask, null]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: simple
+    value: null
+    value_cls_index: jet_label  # just input the label index
+    value_cls_names: [label_H_bb, label_H_cc, label_H_ss, label_H_qq, label_H_bc, label_H_cs, label_H_bq, label_H_cq, label_H_sq, label_H_gg, label_H_ee, label_H_mm, label_H_tauhtaue, label_H_tauhtaum, label_H_tauhtauh, label_H_AA_bbbb, label_H_AA_bbcc, label_H_AA_bbss, label_H_AA_bbqq, label_H_AA_bbgg, label_H_AA_bbee, label_H_AA_bbmm, label_H_AA_bbtauhtaue, label_H_AA_bbtauhtaum, label_H_AA_bbtauhtauh, label_H_AA_bbb, label_H_AA_bbc, label_H_AA_bbs, label_H_AA_bbq, label_H_AA_bbg, label_H_AA_bbe, label_H_AA_bbm, label_H_AA_cccc, label_H_AA_ccss, label_H_AA_ccqq, label_H_AA_ccgg, label_H_AA_ccee, label_H_AA_ccmm, label_H_AA_cctauhtaue, label_H_AA_cctauhtaum, label_H_AA_cctauhtauh, label_H_AA_ccb, label_H_AA_ccc, label_H_AA_ccs, label_H_AA_ccq, label_H_AA_ccg, label_H_AA_cce, label_H_AA_ccm, label_H_AA_ssss, label_H_AA_ssqq, label_H_AA_ssgg, label_H_AA_ssee, label_H_AA_ssmm, label_H_AA_sstauhtaue, label_H_AA_sstauhtaum, label_H_AA_sstauhtauh, label_H_AA_ssb, label_H_AA_ssc, label_H_AA_sss, label_H_AA_ssq, label_H_AA_ssg, label_H_AA_sse, label_H_AA_ssm, label_H_AA_qqqq, label_H_AA_qqgg, label_H_AA_qqee, label_H_AA_qqmm, label_H_AA_qqtauhtaue, label_H_AA_qqtauhtaum, label_H_AA_qqtauhtauh, label_H_AA_qqb, label_H_AA_qqc, label_H_AA_qqs, label_H_AA_qqq, label_H_AA_qqg, label_H_AA_qqe, label_H_AA_qqm, label_H_AA_gggg, label_H_AA_ggee, label_H_AA_ggmm, label_H_AA_ggtauhtaue, label_H_AA_ggtauhtaum, label_H_AA_ggtauhtauh, label_H_AA_ggb, label_H_AA_ggc, label_H_AA_ggs, label_H_AA_ggq, label_H_AA_ggg, label_H_AA_gge, label_H_AA_ggm, label_H_AA_bee, label_H_AA_cee, label_H_AA_see, label_H_AA_qee, label_H_AA_gee, label_H_AA_bmm, label_H_AA_cmm, label_H_AA_smm, label_H_AA_qmm, label_H_AA_gmm, label_H_AA_btauhtaue, label_H_AA_ctauhtaue, label_H_AA_stauhtaue, label_H_AA_qtauhtaue, label_H_AA_gtauhtaue, label_H_AA_btauhtaum, label_H_AA_ctauhtaum, label_H_AA_stauhtaum, label_H_AA_qtauhtaum, label_H_AA_gtauhtaum, label_H_AA_btauhtauh, label_H_AA_ctauhtauh, label_H_AA_stauhtauh, label_H_AA_qtauhtauh, label_H_AA_gtauhtauh, label_H_AA_qqqb, label_H_AA_qqqc, label_H_AA_qqqs, label_H_AA_bbcq, label_H_AA_ccbs, label_H_AA_ccbq, label_H_AA_ccsq, label_H_AA_sscq, label_H_AA_qqbc, label_H_AA_qqbs, label_H_AA_qqcs, label_H_AA_bcsq, label_H_AA_bcs, label_H_AA_bcq, label_H_AA_bsq, label_H_AA_csq, label_H_AA_bcev, label_H_AA_csev, label_H_AA_bqev, label_H_AA_cqev, label_H_AA_sqev, label_H_AA_qqev, label_H_AA_bcmv, label_H_AA_csmv, label_H_AA_bqmv, label_H_AA_cqmv, label_H_AA_sqmv, label_H_AA_qqmv, label_H_AA_bctauev, label_H_AA_cstauev, label_H_AA_bqtauev, label_H_AA_cqtauev, label_H_AA_sqtauev, label_H_AA_qqtauev, label_H_AA_bctaumv, label_H_AA_cstaumv, label_H_AA_bqtaumv, label_H_AA_cqtaumv, label_H_AA_sqtaumv, label_H_AA_qqtaumv, label_H_AA_bctauhv, label_H_AA_cstauhv, label_H_AA_bqtauhv, label_H_AA_cqtauhv, label_H_AA_sqtauhv, label_H_AA_qqtauhv, label_QCD_bbccss, label_QCD_bbccs, label_QCD_bbcc, label_QCD_bbcss, label_QCD_bbcs, label_QCD_bbc, label_QCD_bbss, label_QCD_bbs, label_QCD_bb, label_QCD_bccss, label_QCD_bccs, label_QCD_bcc, label_QCD_bcss, label_QCD_bcs, label_QCD_bc, label_QCD_bss, label_QCD_bs, label_QCD_b, label_QCD_ccss, label_QCD_ccs, label_QCD_cc, label_QCD_css, label_QCD_cs, label_QCD_c, label_QCD_ss, label_QCD_s, label_QCD_light]
+
+
+observers:
+   - jet_pt
+   - jet_eta
+   - jet_phi
+   - jet_energy
+   - jet_nparticles
+   - jet_sdmass
+   - jet_tau1
+   - jet_tau2
+   - jet_tau3
+   - jet_tau4
+
+weights:
+   ### [option 1] use precomputed weights stored in the input files
+   # use_precomputed_weights: true
+   # weight_branches: [weight, class_weight]
+   ### [option 2] compute weights on-the-fly using reweighting histograms
+   use_precomputed_weights: false
+   reweight_method: flat
+   reweight_vars:
+      jet_pt: [200, 240, 287, 344, 412, 493, 590, 707, 847, 1014, 1215, 1455, 1743, 2087, 2500]
+      jet_sdmass: [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310, 320, 330, 340, 350, 360, 370, 380, 390, 400, 410, 420, 430, 440, 450, 460, 470, 480, 490, 500]
+   reweight_classes:
+      [
+         label_H_QQ, label_H_gg, label_H_ll, label_H_tauhtaul, label_H_tauhtauh,
+         label_H_AA_QQQQ, label_H_AA_QQgg, label_H_AA_gggg, label_H_AA_QQQ, label_H_AA_QQg, label_H_AA_Qgg, label_H_AA_ggg, 
+         label_H_AA_QQll, label_H_AA_QQl, label_H_AA_Qll, label_H_AA_QQtauhtaul, label_H_AA_QQtauhtauh, label_H_AA_Qtauhtaul, label_H_AA_Qtauhtauh,
+         label_H_AA_ggll, label_H_AA_ggl, label_H_AA_gll, label_H_AA_ggtauhtaul, label_H_AA_ggtauhtauh, label_H_AA_gtauhtaul, label_H_AA_gtauhtauh,
+         label_H_AA_QQlv, label_H_AA_QQtaulv, label_H_AA_QQtauhv,
+         label_QCD, 
+      ]
+   class_weights:
+      [
+         0.4, 0.05, 0.08, 0.01, 0.015,
+         0.32, 0.06, 0.0075, 0.05, 0.005, 0.005, 0.0015,
+         0.16, 0.01, 0.012, 0.04, 0.04, 0.0018, 0.0024,
+         0.04, 0.0025, 0.003, 0.01, 0.01, 0.00045, 0.0006,
+         0.08, 0.015, 0.05,
+         0.25,
+      ]
+   reweight_hists:
