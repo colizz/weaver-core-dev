@@ -2200,6 +2200,7 @@ python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom \
 
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
 $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom --run-mode train-only \
+--extra-selection "(ak.values_astype(np.tan(jet_energy) * 100000, 'int') % 50 < 28)" \
 --use-amp \
 --batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.01 \
 --backend nccl --data-train $DATAFILE_MOD \

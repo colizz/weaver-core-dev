@@ -68,12 +68,12 @@ new_variables:
 
    label_QCD: ((jet_label >= 164) & (jet_label < 191))
 
-   # gen: concatenate genres and genpart
-   gen_pt: ak.concatenate([genres_pt, genpart_pt], 1)
-   gen_eta: ak.concatenate([genres_eta, genpart_eta], 1)
-   gen_phi: ak.concatenate([genres_phi, genpart_phi], 1)
-   gen_mass: ak.concatenate([genres_mass, genpart_mass], 1)
-   gen_pid: ak.concatenate([genres_pid, genpart_pid], 1)
+   # gen: concatenate genres and genpart (a temporary hack: also add a jet entry to avoid len=0 for QCD jets)
+   gen_pt: ak.concatenate([ak.singletons(jet_pt), genres_pt, genpart_pt], 1)
+   gen_eta: ak.concatenate([ak.singletons(jet_eta), genres_eta, genpart_eta], 1)
+   gen_phi: ak.concatenate([ak.singletons(jet_phi), genres_phi, genpart_phi], 1)
+   gen_mass: ak.concatenate([ak.singletons(jet_sdmass), genres_mass, genpart_mass], 1)
+   gen_pid: ak.concatenate([ak.singletons(ak.zeros_like(jet_pt)), genres_pid, genpart_pid], 1)
 
    # gen particle's kinematic features
    gen_p4: _p4_from_ptetaphim(gen_pt, gen_eta, gen_phi, gen_mass)
@@ -97,7 +97,7 @@ new_variables:
    gen_deltaR: np.hypot(gen_deta, gen_dphi)
 
    # ID
-   gen_signpid: np.sign(gen_pid)
+   gen_signpid: np.sign(gen_pid) * (gen_pid != 0)
    gen_abspid: np.abs(gen_pid)
    gen_isU: gen_abspid == 1
    gen_isD: gen_abspid == 2
