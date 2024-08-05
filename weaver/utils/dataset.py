@@ -270,6 +270,7 @@ class _SimpleIter(object):
             self.isplit += 1
         else:
             self.ipos += self._fetch_step
+            self.isplit = 0
 
     def get_data(self, i):
         # inputs
