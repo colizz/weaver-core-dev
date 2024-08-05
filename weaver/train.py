@@ -54,6 +54,8 @@ parser.add_argument('-t', '--data-test', nargs='*', default=[],
                          ' (c) split output per N input files, `--data-test a%10:/path/to/a/*`, will split per 10 input files')
 parser.add_argument('--data-fraction', type=float, default=1,
                     help='fraction of events to load from each file; for training, the events are randomly selected for each epoch')
+parser.add_argument('--data-split-group', type=int, default=1,
+                    help='number of groups to split the dataset when loading. This helps to mitigate the memory usage of dataloader when a number larger than 1 is specified')
 parser.add_argument('--file-fraction', type=float, default=1,
                     help='fraction of files to load; for training, the files are randomly selected for each epoch')
 parser.add_argument('--fetch-by-files', action='store_true', default=False,
@@ -236,6 +238,7 @@ def train_load(args):
         _logger.info(train_files)
         _logger.info(val_files)
         args.data_fraction = 0.1
+        args.data_split_group = 1
         args.fetch_step = 0.002
 
     if args.in_memory and (args.steps_per_epoch is None or args.steps_per_epoch_val is None):
@@ -243,7 +246,7 @@ def train_load(args):
 
     train_data = SimpleIterDataset(train_file_dict, args.data_config, for_training=True,
                                    extra_selection=args.extra_selection,
-                                   load_range_and_fraction=(train_range, args.data_fraction),
+                                   load_range_and_fraction=(train_range, args.data_fraction, args.data_split_group),
                                    file_fraction=args.file_fraction,
                                    fetch_by_files=args.fetch_by_files,
                                    fetch_step=args.fetch_step,
@@ -252,7 +255,7 @@ def train_load(args):
                                    name='train' + ('' if args.local_rank is None else '_rank%d' % args.local_rank))
     val_data = SimpleIterDataset(val_file_dict, args.data_config, for_training=True,
                                  extra_selection=args.extra_selection,
-                                 load_range_and_fraction=(val_range, args.data_fraction),
+                                 load_range_and_fraction=(val_range, args.data_fraction, args.data_split_group),
                                  file_fraction=args.file_fraction,
                                  fetch_by_files=args.fetch_by_files,
                                  fetch_step=args.fetch_step,
@@ -311,8 +314,9 @@ def test_load(args):
         _logger.info('Running on test file group %s with %d files:\n...%s', name, len(filelist), '\n...'.join(filelist))
         num_workers = min(args.num_workers, len(filelist))
         test_data = SimpleIterDataset({name: filelist}, args.data_config, for_training=False,
-                                      load_range_and_fraction=(tuple(args.test_range), args.data_fraction),
-                                      fetch_by_files=True, fetch_step=1,
+                                      load_range_and_fraction=(tuple(args.test_range), args.data_fraction, args.data_split_group),
+                                    #   fetch_by_files=True, fetch_step=1,
+                                      fetch_by_files=False, fetch_step=0.01,
                                       name='test_' + name)
         test_loader = DataLoader(test_data, num_workers=num_workers, batch_size=args.batch_size, drop_last=False,
                                  pin_memory=True)

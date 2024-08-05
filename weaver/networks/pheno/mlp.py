@@ -103,7 +103,7 @@ class MultiLayerPerceptron(nn.Module):
         # x[0]: ft vars in 2D branch, dim: (N, 1, C)
         # x[1]: (if valid) aux vars read from length=None, dim: (N, C)
 
-        x_ft = x[0].squeeze(1)
+        x_ft = x[0].view(x[0].shape[0], -1)
 
         if self.aux_mlp is not None:
             # has an additional aux path.

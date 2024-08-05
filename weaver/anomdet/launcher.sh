@@ -96,3 +96,32 @@ GPU=7;
 for SEED in `seq 1 20`; do
 ./run_dijet_IAD.sh Wkk 6400 $GPU $SEED & ./run_dijet_IAD.sh Wkk 6800 $GPU $SEED & ./run_dijet_IAD.sh Wkk 7200 $GPU $SEED & wait
 done
+
+# final
+GPU=0;
+for SEED in `seq 1 20`; do
+./run_dijet_IAD.sh Wkk 4200 $GPU $SEED & ./run_dijet_IAD.sh Wkk 5000 $GPU $SEED & ./run_dijet_IAD.sh Wkk 6500 $GPU $SEED & ./run_dijet_IAD.sh Wkk 8500 $GPU $SEED & wait
+done
+
+GPU=1;
+for SEED in `seq 1 20`; do
+./run_dijet_IAD.sh Wkk 11000 $GPU $SEED & ./run_dijet_IAD.sh Wkk 14000 $GPU $SEED & ./run_dijet_IAD.sh Wkk 18000 $GPU $SEED & ./run_dijet_IAD.sh Wkk 23000 $GPU $SEED & wait
+done
+
+# final for highlevel
+GPU=0;
+for SEED in `seq 1 20`; do
+./run_dijet_IAD_hilv.sh Wkk 4200 $GPU $SEED & ./run_dijet_IAD_hilv.sh Wkk 5000 $GPU $SEED & ./run_dijet_IAD_hilv.sh Wkk 6500 $GPU $SEED & ./run_dijet_IAD_hilv.sh Wkk 8500 $GPU $SEED & wait
+done
+
+GPU=1;
+for SEED in `seq 1 20`; do
+./run_dijet_IAD_hilv.sh Wkk 11000 $GPU $SEED & ./run_dijet_IAD_hilv.sh Wkk 14000 $GPU $SEED & ./run_dijet_IAD_hilv.sh Wkk 18000 $GPU $SEED & ./run_dijet_IAD_hilv.sh Wkk 23000 $GPU $SEED & wait
+done
+
+GPU=0; SIGEVTS=(400 800 1200 1600)
+GPU=1; SIGEVTS=(2000 2400 2800 3200)
+GPU=2; SIGEVTS=(3600)
+for SEED in `seq 1 20`; do
+./run_dijet_IAD_hilv.sh Wkk ${SIGEVTS[0]} $GPU $SEED & ./run_dijet_IAD_hilv.sh Wkk ${SIGEVTS[1]} $GPU $SEED & ./run_dijet_IAD_hilv.sh Wkk ${SIGEVTS[2]} $GPU $SEED & ./run_dijet_IAD_hilv.sh Wkk ${SIGEVTS[3]} $GPU $SEED & wait
+done

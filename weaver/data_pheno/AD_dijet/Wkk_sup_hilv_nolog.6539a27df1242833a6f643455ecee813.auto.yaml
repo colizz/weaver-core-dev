@@ -1,0 +1,94 @@
+treename: null
+selection: (dijet_mass >= 2500) & (dijet_mass < 3100)
+test_time_selection: (dijet_mass >= 2200) & (dijet_mass < 3400)
+preprocess:
+  method: manual
+  data_fraction: null
+  params: null
+new_variables:
+  jet_1_nparticles_log: np.log(np.maximum(jet_1_nparticles, 1e-8))
+  jet_1_sdmass_log: np.log(np.maximum(jet_1_sdmass, 1e-8))
+  jet_1_tau21_log: jet_1_tau2 / np.maximum(jet_1_tau1, 1e-8)
+  jet_1_tau32_log: jet_1_tau3 / np.maximum(jet_1_tau2, 1e-8)
+  jet_1_tau43_log: jet_1_tau4 / np.maximum(jet_1_tau3, 1e-8)
+  jet_2_nparticles_log: np.log(np.maximum(jet_2_nparticles, 1e-8))
+  jet_2_sdmass_log: np.log(np.maximum(jet_2_sdmass, 1e-8))
+  jet_2_tau21_log: jet_2_tau2 / np.maximum(jet_2_tau1, 1e-8)
+  jet_2_tau32_log: jet_2_tau3 / np.maximum(jet_2_tau2, 1e-8)
+  jet_2_tau43_log: jet_2_tau4 / np.maximum(jet_2_tau3, 1e-8)
+  label_sig: (event_class == 21)
+  label_sm: (event_class <= 18)
+  label_index: np.argmax(np.stack([label_sig, label_sm], -1), -1)
+  _label_: np.argmax(np.stack([label_sig,label_sm], axis=1), axis=1)
+  _labelcheck_: np.sum(np.stack([label_sig,label_sm], axis=1), axis=1)
+inputs:
+  ft_vars:
+    length: null
+    vars:
+    - - jet_1_sdmass_log
+      - 3
+      - 0.8
+    - - jet_1_nparticles_log
+      - 4
+      - 1.5
+    - - jet_1_tau21_log
+      - 0.5
+      - 4
+    - - jet_1_tau32_log
+      - 0.5
+      - 4
+    - - jet_1_tau43_log
+      - 0.5
+      - 4
+    - - jet_2_sdmass_log
+      - 3
+      - 0.8
+    - - jet_2_nparticles_log
+      - 4
+      - 1.5
+    - - jet_2_tau21_log
+      - 0.5
+      - 4
+    - - jet_2_tau32_log
+      - 0.5
+      - 4
+    - - jet_2_tau43_log
+      - 0.5
+      - 4
+  label_vars:
+    length: null
+    vars:
+    - - label_index
+      - null
+labels:
+  type: simple
+  value:
+  - label_sig
+  - label_sm
+observers:
+- event_no
+- event_class
+- dijet_mass
+monitor_variables: []
+weights:
+  use_precomputed_weights: false
+  reweight_method: flat
+  reweight_vars:
+    label_sig:
+    - -100000
+    - 100000
+    label_sm:
+    - -100000
+    - 100000
+  reweight_classes:
+  - label_sig
+  - label_sm
+  reweight_threshold: 0
+  class_weights:
+  - 1
+  - 1
+  reweight_hists:
+    label_sig:
+    - - 0.8999999761581421
+    label_sm:
+    - - 0.6963922381401062

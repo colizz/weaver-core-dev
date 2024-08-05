@@ -1,0 +1,145 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `ak` in the expression
+
+selection: >-
+    (dijet_mass >= 2500) & (dijet_mass < 3100)
+
+test_time_selection: >-
+    (dijet_mass >= 2200) & (dijet_mass < 3400)
+
+new_variables:
+    ### [format] name: formula
+    ### can use functions from `math`, `np` (numpy), and `ak` in the expression
+    # training categories
+    label_sig: (event_class == 21)
+    label_sm: (event_class <= 18)
+    # input features
+    jet_1_part_mask: ak.ones_like(jet_1_part_energy)
+    jet_1_part_pt: np.hypot(jet_1_part_px, jet_1_part_py)
+    jet_1_part_pt_log: np.log(jet_1_part_pt)
+    jet_1_part_e_log: np.log(jet_1_part_energy)
+    jet_1_part_logptrel: np.log(jet_1_part_pt/jet_1_pt)
+    jet_1_part_logerel: np.log(jet_1_part_energy/jet_1_energy)
+    jet_1_part_deltaR: np.hypot(jet_1_part_deta, jet_1_part_dphi)
+    jet_1_part_d0: np.tanh(jet_1_part_d0val)
+    jet_1_part_dz: np.tanh(jet_1_part_dzval)
+    jet_1_part_isElectron: (jet_1_part_pid == 11) | (jet_1_part_pid == -11)
+    jet_1_part_isMuon: (jet_1_part_pid == 13) | (jet_1_part_pid == -13)
+    jet_1_part_isPhoton: (jet_1_part_pid == 22)
+    jet_1_part_isChargedHadron: (jet_1_part_charge != 0) & (~jet_1_part_isElectron) & (~jet_1_part_isMuon)
+    jet_1_part_isNeutralHadron: (jet_1_part_charge == 0) & (~jet_1_part_isPhoton)
+    jet_2_part_mask: ak.ones_like(jet_2_part_energy)
+    jet_2_part_pt: np.hypot(jet_2_part_px, jet_2_part_py)
+    jet_2_part_pt_log: np.log(jet_2_part_pt)
+    jet_2_part_e_log: np.log(jet_2_part_energy)
+    jet_2_part_logptrel: np.log(jet_2_part_pt/jet_2_pt)
+    jet_2_part_logerel: np.log(jet_2_part_energy/jet_2_energy)
+    jet_2_part_deltaR: np.hypot(jet_2_part_deta, jet_2_part_dphi)
+    jet_2_part_d0: np.tanh(jet_2_part_d0val)
+    jet_2_part_dz: np.tanh(jet_2_part_dzval)
+    jet_2_part_isElectron: (jet_2_part_pid == 11) | (jet_2_part_pid == -11)
+    jet_2_part_isMuon: (jet_2_part_pid == 13) | (jet_2_part_pid == -13)
+    jet_2_part_isPhoton: (jet_2_part_pid == 22)
+    jet_2_part_isChargedHadron: (jet_2_part_charge != 0) & (~jet_2_part_isElectron) & (~jet_2_part_isMuon)
+    jet_2_part_isNeutralHadron: (jet_2_part_charge == 0) & (~jet_2_part_isPhoton)
+
+preprocess:
+    ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+    method: manual
+    ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+    data_fraction:
+
+inputs:
+    pf1_features:
+        length: 128
+        pad_mode: wrap
+        vars: 
+            - [jet_1_part_pt_log, 1.7, 0.7]
+            - [jet_1_part_e_log, 2.0, 0.7]
+            - [jet_1_part_logptrel, -4.7, 0.7]
+            - [jet_1_part_logerel, -4.7, 0.7]
+            - [jet_1_part_deltaR, 0.2, 4.0]
+            - [jet_1_part_charge, null]
+            - [jet_1_part_isChargedHadron, null]
+            - [jet_1_part_isNeutralHadron, null]
+            - [jet_1_part_isPhoton, null]
+            - [jet_1_part_isElectron, null]
+            - [jet_1_part_isMuon, null]
+            - [jet_1_part_d0, null]
+            - [jet_1_part_d0err, 0, 1, 0, 1]
+            - [jet_1_part_dz, null]
+            - [jet_1_part_dzerr, 0, 1, 0, 1]
+            - [jet_1_part_deta, null]
+            - [jet_1_part_dphi, null]
+    pf1_vectors:
+        length: 128
+        pad_mode: wrap
+        vars: 
+            - [jet_1_part_px, null]
+            - [jet_1_part_py, null]
+            - [jet_1_part_pz, null]
+            - [jet_1_part_energy, null]
+    pf1_mask:
+        length: 128
+        pad_mode: constant
+        vars: 
+            - [jet_1_part_mask, null]
+    pf2_features:
+        length: 128
+        pad_mode: wrap
+        vars: 
+            - [jet_2_part_pt_log, 1.7, 0.7]
+            - [jet_2_part_e_log, 2.0, 0.7]
+            - [jet_2_part_logptrel, -4.7, 0.7]
+            - [jet_2_part_logerel, -4.7, 0.7]
+            - [jet_2_part_deltaR, 0.2, 4.0]
+            - [jet_2_part_charge, null]
+            - [jet_2_part_isChargedHadron, null]
+            - [jet_2_part_isNeutralHadron, null]
+            - [jet_2_part_isPhoton, null]
+            - [jet_2_part_isElectron, null]
+            - [jet_2_part_isMuon, null]
+            - [jet_2_part_d0, null]
+            - [jet_2_part_d0err, 0, 1, 0, 1]
+            - [jet_2_part_dz, null]
+            - [jet_2_part_dzerr, 0, 1, 0, 1]
+            - [jet_2_part_deta, null]
+            - [jet_2_part_dphi, null]
+    pf2_vectors:
+        length: 128
+        pad_mode: wrap
+        vars: 
+            - [jet_2_part_px, null]
+            - [jet_2_part_py, null]
+            - [jet_2_part_pz, null]
+            - [jet_2_part_energy, null]
+    pf2_mask:
+        length: 128
+        pad_mode: constant
+        vars: 
+            - [jet_2_part_mask, null]
+
+labels:
+    ### type can be `simple`, `custom`, 'hybrid'
+    type: simple
+    value: [label_sig, label_sm]
+
+
+observers:
+    - event_no
+    - event_class
+    - dijet_mass
+
+weights:
+   ### [option 1] use precomputed weights stored in the input files
+   # use_precomputed_weights: true
+   # weight_branches: [weight, class_weight]
+   ### [option 2] compute weights on-the-fly using reweighting histograms
+   use_precomputed_weights: false
+   reweight_method: flat
+   reweight_vars:
+      label_sig: [-100000, 100000] # dummy
+      label_sm: [-100000, 100000] # dummy
+   reweight_classes: [label_sig, label_sm]
+   class_weights: [1, 1]
+   reweight_hists:

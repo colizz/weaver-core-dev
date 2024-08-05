@@ -30,6 +30,12 @@ def get_tensorboard_custom_fn(tb, model_output, model, epoch, i_batch, mode, inp
             elif os.uname()[1].startswith('farm221'):
                 basedir = '/data/licq/samples/JetClassII'
 
+            match = re.search(r'(?:phy.pku.edu.cn_|farm221_)([^.]*)', tb.writer.log_dir)
+            if match:
+                data_card = match.group(1)
+            else:
+                raise ValueError(f"Cannot find data card from log_dir: {tb.writer.log_dir}")
+
             tb._config = SimpleNamespace(
                 edge_full = (2200, 3400),
                 edge_sr = (2500, 3100),
@@ -42,10 +48,44 @@ def get_tensorboard_custom_fn(tb, model_output, model, epoch, i_batch, mode, inp
             tb._df = _df
             tb._df_nevt_scale = len(df) / nevt_read
 
-            _arr1 = torch.Tensor(ak.to_numpy(tb._df.jet_1_hidneurons)).to(model_output[0][0]).unsqueeze(1) # (N, 1, C)
-            _arr2 = torch.Tensor(ak.to_numpy(tb._df.jet_2_hidneurons)).to(model_output[0][0]).unsqueeze(1) # (N, 1, C)
-            tb._eval_input_arrays = torch.cat([_arr1, _arr2], dim=1)
-             
+            dev = next(model.parameters()).device
+            if 'hilv' in tb.writer.log_dir:
+                # _arr = np.array([
+                #     (np.log(np.maximum(ak.to_numpy(tb._df.jet_1_sdmass), 1e-8)) - 3) * 0.8,
+                #     (np.log(np.maximum(ak.to_numpy(tb._df.jet_1_nparticles), 1e-8)) - 4) * 1.5,
+                #     (tb._df.jet_1_tau2 / np.maximum(ak.to_numpy(tb._df.jet_1_tau1), 1e-8) - 0.5) * 4.,
+                #     (tb._df.jet_1_tau3 / np.maximum(ak.to_numpy(tb._df.jet_1_tau2), 1e-8) - 0.5) * 4.,
+                #     (tb._df.jet_1_tau4 / np.maximum(ak.to_numpy(tb._df.jet_1_tau3), 1e-8) - 0.5) * 4.,
+                #     (np.log(np.maximum(ak.to_numpy(tb._df.jet_2_sdmass), 1e-8)) - 3) * 0.8,
+                #     (np.log(np.maximum(ak.to_numpy(tb._df.jet_2_nparticles), 1e-8)) - 4) * 1.5,
+                #     (tb._df.jet_2_tau2 / np.maximum(ak.to_numpy(tb._df.jet_2_tau1), 1e-8) - 0.5) * 4.,
+                #     (tb._df.jet_2_tau3 / np.maximum(ak.to_numpy(tb._df.jet_2_tau2), 1e-8) - 0.5) * 4.,
+                #     (tb._df.jet_2_tau4 / np.maximum(ak.to_numpy(tb._df.jet_2_tau3), 1e-8) - 0.5) * 4.,
+                # ]).transpose(1, 0) # (N, C)
+                _arr = np.array([
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_1_sdmass), 1e-8)) - 3) * 0.8,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_1_nparticles), 1e-8)) - 4) * 1.5,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_1_tau1), 1e-8)) + 2) * 1.,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_1_tau2), 1e-8)) + 3) * 1.,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_1_tau3), 1e-8)) + 3.5) * 1.,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_1_tau4), 1e-8)) + 4) * 1.,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_2_sdmass), 1e-8)) - 3) * 0.8,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_2_nparticles), 1e-8)) - 4) * 1.5,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_2_tau1), 1e-8)) + 2) * 1.,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_2_tau2), 1e-8)) + 3) * 1.,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_2_tau3), 1e-8)) + 3.5) * 1.,
+                    (np.log(np.maximum(ak.to_numpy(tb._df.jet_2_tau4), 1e-8)) + 4) * 1.,
+                ]).transpose(1, 0) # (N, C)
+                tb._eval_input_arrays = torch.Tensor(_arr).to(dev) # (N, C)
+                tb._roc_ylim = (0.0, 2.0)
+
+            else:
+                # transfer learning
+                _arr1 = torch.Tensor(ak.to_numpy(tb._df.jet_1_hidneurons)).to(dev).unsqueeze(1) # (N, 1, C)
+                _arr2 = torch.Tensor(ak.to_numpy(tb._df.jet_2_hidneurons)).to(dev).unsqueeze(1) # (N, 1, C)
+                tb._eval_input_arrays = torch.cat([_arr1, _arr2], dim=1)
+                tb._roc_ylim = (0.0, 10.0)
+
         output = model(tb._eval_input_arrays, None)[0]
         disc_val_ensemble = [torch.softmax(out, dim=1).detach().cpu().numpy()[:, 0] for out in output] # score_label_sr
         disc_val = sum(disc_val_ensemble) / len(disc_val_ensemble)
@@ -129,7 +169,7 @@ def get_tensorboard_custom_fn(tb, model_output, model, epoch, i_batch, mode, inp
                 axes[1].plot(fpr, z, color='black', linewidth=2)
 
         axes[0].set_xlim([0.0, 1.0]); axes[1].set_xlim([1e-6, 1.0]); axes[1].set_xscale('log'); 
-        axes[0].set_ylim([0.0, 10]); axes[1].set_ylim([0.0, 10])
+        axes[0].set_ylim(tb._roc_ylim); axes[1].set_ylim(tb._roc_ylim)
         axes[0].set_xlabel('Signal efficiency', ha='right', x=1.0); axes[1].set_xlabel('Backgronud efficiency', ha='right', x=1.0); axes[0].set_ylabel('Significance', ha='right', y=1.0)
         axes[0].grid(); axes[1].grid()
         tb.writer.add_figure(f'Signif/eval/epoch{str(epoch).zfill(4)}', f)

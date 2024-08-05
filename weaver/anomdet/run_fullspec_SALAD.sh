@@ -50,7 +50,7 @@ python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom --ru
 # 2. Run SALAD step1
 
 # PREFIX=fullspec_SALAD_step1_$MASSRANGE.ensem100.64-64.flat.seed${SEED} network_name=pheno/mlp; ext_opt='-o num_ensemble 100 -o ft_layer_params [(64,0.0),(64,0.0)] --start-lr 1e-3 --num-epochs 1 --lr-scheduler none --samples-per-epoch 5000000 --samples-per-epoch-val 1000000 --batch-size 10000 --train-mode-params metric:loss --use-last-model --tensorboard-custom-fn ../tensorboard_fn/JetClassII_fullspec_AD_ensemble.py';
-wgtloss_opt=' -o num_ensemble_weight_model 100 -o ft_layer_params_weight_model [(64,0.0),(64,0.0)]'; wgtloss_path=./model/$PREFIX/net_best_epoch_state.pt;
+# wgtloss_opt=' -o num_ensemble_weight_model 100 -o ft_layer_params_weight_model [(64,0.0),(64,0.0)]'; wgtloss_path=./model/$PREFIX/net_best_epoch_state.pt;
 PREFIX=fullspec_SALAD_step1_$MASSRANGE.ensem100.512loadffn-64.flat.seed${SEED} network_name=pheno/mlp; ext_opt='-o num_ensemble 100 -o ft_layer_params [(512,0.0),(64,0.0)] --load-model-weights finetune_pheno.ensemble.0 --start-lr 1e-3 --num-epochs 1 --lr-scheduler none --samples-per-epoch 5000000 --samples-per-epoch-val 1000000 --batch-size 10000 --train-mode-params metric:loss --use-last-model --tensorboard-custom-fn ../tensorboard_fn/JetClassII_fullspec_AD_ensemble.py';
 wgtloss_opt=' -o num_ensemble_weight_model 100 -o ft_layer_params_weight_model [(512,0.0),(64,0.0)]'; wgtloss_path=./model/$PREFIX/net_best_epoch_state.pt;
 
