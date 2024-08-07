@@ -185,6 +185,20 @@ class CLIPWrapper(torch.nn.Module):
         return logits_cls, labels_cls, logits_cont, logits_cont_gen
 
 
+class ParticleTransformerWrapper(torch.nn.Module):
+    def __init__(self, **kwargs) -> None:
+        super().__init__()
+        kwargs.update(return_embed=False)
+        self.mod_main = ParticleTransformerMultiClsTokens(**kwargs)
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return {'mod_main.cls_token', }
+
+    def forward(self, points, features, lorentz_vectors, mask):
+        return self.mod_main(features, v=lorentz_vectors, mask=mask)
+
+
 class CLIPLoss(torch.nn.Module):
     '''
         Computes the CLIP loss and classification loss
@@ -248,7 +262,7 @@ def get_model(data_config, **kwargs):
         num_classes_cls=data_config.label_value_cls_num, # for onnx export
 
         ## GEN ParT configs
-        gen_mod_input_dim=len(data_config.input_dicts['gen_features']),
+        gen_mod_input_dim=len(data_config.input_dicts.get('gen_features', [])),
         gen_mod_num_classes=None,
         # network configurations
         gen_mod_pair_input_dim=4,
@@ -267,10 +281,16 @@ def get_model(data_config, **kwargs):
     )
 
     kwargs.pop('beta', None)
+    for_clip_finetune = kwargs.pop('for_clip_finetune', False)
     cfg.update(**kwargs)
-    _logger.info('Model config: %s' % str(cfg))
 
-    model = CLIPWrapper(**cfg)
+    if not for_clip_finetune:
+        _logger.info('Model config: %s' % str(cfg))
+        model = CLIPWrapper(**cfg)
+    else:
+        cfg = {k: v for k, v in cfg.items() if not k.startswith('gen_mod_')}
+        _logger.info('Model config: %s' % str(cfg))
+        model = ParticleTransformerWrapper(**cfg)
 
     model_info = {
         'input_names': list(data_config.input_names),
@@ -284,4 +304,8 @@ def get_model(data_config, **kwargs):
 
 def get_loss(data_config, **kwargs):
     beta = kwargs.get('beta', 1.)
-    return CLIPLoss(beta=beta)
+    for_clip_finetune = kwargs.pop('for_clip_finetune', False)
+    if not for_clip_finetune:
+        return CLIPLoss(beta=beta)
+    else:
+        return torch.nn.CrossEntropyLoss()

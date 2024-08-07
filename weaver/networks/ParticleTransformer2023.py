@@ -75,7 +75,7 @@ def p3_norm(p, eps=1e-8):
     return p[:, :3] / p[:, :3].norm(dim=1, keepdim=True).clamp(min=eps)
 
 
-def pairwise_lv_fts(xi, xj, num_outputs=4, eps=1e-8, for_onnx=False):
+def pairwise_lv_fts(xi, xj, xsum, num_outputs=4, eps=1e-8, for_onnx=False):
     pti, rapi, phii = to_ptrapphim(xi, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
     ptj, rapj, phij = to_ptrapphim(xj, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
 
@@ -111,6 +111,50 @@ def pairwise_lv_fts(xi, xj, num_outputs=4, eps=1e-8, for_onnx=False):
         outputs += [deltarap, deltaphi]
 
     assert (len(outputs) == num_outputs)
+    return torch.cat(outputs, dim=1)
+
+
+def pairwise_lv_fts_norm(xi, xj, xsum, num_outputs=6, eps=1e-8, for_onnx=False):
+    assert num_outputs == 6
+    pti, rapi, phii = to_ptrapphim(xi, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
+    ptj, rapj, phij = to_ptrapphim(xj, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
+    ptall, *_ = to_ptrapphim(xsum, False, eps=None, for_onnx=for_onnx).split((1, 1, 1), dim=1)
+
+    delta = delta_r2(rapi, phii, rapj, phij).sqrt()
+    lndelta = torch.log(delta.clamp(min=eps))
+    if num_outputs == 1:
+        return lndelta
+
+    if num_outputs > 1:
+        ptmin = ((pti <= ptj) * pti + (pti > ptj) * ptj) if for_onnx else torch.minimum(pti, ptj)
+        lnkt = torch.log((ptmin * delta).clamp(min=eps))
+        lnktrel = lnkt - torch.log(ptall)
+        lnz = torch.log((ptmin / (pti + ptj).clamp(min=eps)).clamp(min=eps))
+        outputs = [lnkt, lnktrel + 7.5, lnz, lndelta]
+
+    if num_outputs > 4:
+        xij = xi + xj
+        lnm2 = torch.log(to_m2(xij, eps=eps))
+        lnm2rel = lnm2 - torch.log(to_m2(xsum, eps=eps))
+        outputs.extend([lnm2, lnm2rel + 10.])
+
+    if num_outputs > 6:
+        lnds2 = torch.log(torch.clamp(-to_m2(xi - xj, eps=None), min=eps))
+        outputs.append(lnds2)
+
+    # the following features are not symmetric for (i, j)
+    if num_outputs > 7:
+        xj_boost = boost(xj, xij)
+        costheta = (p3_norm(xj_boost, eps=eps) * p3_norm(xij, eps=eps)).sum(dim=1, keepdim=True)
+        outputs.append(costheta)
+
+    if num_outputs > 8:
+        deltarap = rapi - rapj
+        deltaphi = delta_phi(phii, phij)
+        outputs += [deltarap, deltaphi]
+
+    assert (len(outputs) == num_outputs)
+
     return torch.cat(outputs, dim=1)
 
 
@@ -259,6 +303,7 @@ class Embed(nn.Module):
 class PairEmbed(nn.Module):
     def __init__(
             self, pairwise_lv_dim, pairwise_input_dim, dims,
+            use_pair_norm=False,
             remove_self_pair=False, use_pre_activation_pair=True, mode='sum',
             normalize_input=True, activation='gelu', eps=1e-8,
             for_onnx=False):
@@ -266,11 +311,16 @@ class PairEmbed(nn.Module):
 
         self.pairwise_lv_dim = pairwise_lv_dim
         self.pairwise_input_dim = pairwise_input_dim
-        self.is_symmetric = (pairwise_lv_dim <= 5) and (pairwise_input_dim == 0)
+        self.use_pair_norm = use_pair_norm
+        if not use_pair_norm:
+            self.is_symmetric = (pairwise_lv_dim <= 5) and (pairwise_input_dim == 0)
+            self.pairwise_lv_fts = partial(pairwise_lv_fts, num_outputs=pairwise_lv_dim, eps=eps, for_onnx=for_onnx)
+        else:
+            self.is_symmetric = (pairwise_lv_dim <= 6) and (pairwise_input_dim == 0)
+            self.pairwise_lv_fts = partial(pairwise_lv_fts_norm, num_outputs=pairwise_lv_dim, eps=eps, for_onnx=for_onnx)
         self.remove_self_pair = remove_self_pair
         self.mode = mode
         self.for_onnx = for_onnx
-        self.pairwise_lv_fts = partial(pairwise_lv_fts, num_outputs=pairwise_lv_dim, eps=eps, for_onnx=for_onnx)
         self.out_dim = dims[-1]
 
         if self.mode == 'concat':
@@ -330,16 +380,18 @@ class PairEmbed(nn.Module):
                 i, j = torch.tril_indices(seq_len, seq_len, offset=-1 if self.remove_self_pair else 0,
                                           device=(x if x is not None else uu).device)
                 if x is not None:
+                    xsum = x.sum(dim=-1, keepdims=True) if self.use_pair_norm else None
                     x = x.unsqueeze(-1).repeat(1, 1, 1, seq_len)
                     xi = x[:, :, i, j]  # (batch, dim, seq_len*(seq_len+1)/2)
                     xj = x[:, :, j, i]
-                    x = self.pairwise_lv_fts(xi, xj)
+                    x = self.pairwise_lv_fts(xi, xj, xsum)
                 if uu is not None:
                     # (batch, dim, seq_len*(seq_len+1)/2)
                     uu = uu[:, :, i, j]
             else:
                 if x is not None:
-                    x = self.pairwise_lv_fts(x.unsqueeze(-1), x.unsqueeze(-2))
+                    xsum = x.sum(dim=-1, keepdims=True) if self.use_pair_norm else None
+                    x = self.pairwise_lv_fts(x.unsqueeze(-1), x.unsqueeze(-2), xsum)
                     if self.remove_self_pair:
                         i = torch.arange(0, seq_len, device=x.device)
                         x[:, :, i, i] = 0
