@@ -23,9 +23,8 @@ parser.add_argument('--train-mode', type=str, default='cls',
 parser.add_argument('--train-mode-params', type=str, default='',
                     choices=['', 'metric:loss'],
                     help='training mode parameters')
-parser.add_argument('--run-mode', type=str, default='default',
-                    choices=['default', 'train-only', 'val-only'],
-                    help='training mode')
+parser.add_argument('--run-mode', type=functools.partial(str.split, sep=','), default='train,val,test',
+                    help='comma-separated list of the steps (train|val|test) to run, e.g., `train,test`')
 parser.add_argument('--early-stop', action='store_true', default=False,
                     help='Early stop training if the validation metric does not improve for a few epochs')
 parser.add_argument('--early-stop-dlr', type=float, default=5e-4,
@@ -320,7 +319,7 @@ def test_load(args):
         test_data = SimpleIterDataset({name: filelist}, args.data_config, for_training=False,
                                       load_range_and_fraction=(tuple(args.test_range), args.data_fraction, args.data_split_group),
                                     #   fetch_by_files=True, fetch_step=1,
-                                      fetch_by_files=False, fetch_step=0.01,
+                                      fetch_by_files=False, fetch_step=0.05,
                                       name='test_' + name)
         test_loader = DataLoader(test_data, num_workers=num_workers, batch_size=args.batch_size, drop_last=False,
                                  pin_memory=True)
@@ -354,7 +353,7 @@ def onnx(args, model, data_config, model_info):
                       input_names=model_info['input_names'],
                       output_names=model_info['output_names'],
                       dynamic_axes=model_info.get('dynamic_axes', None),
-                      opset_version=11) # 11 for 10_6, 14 for Run 3
+                      opset_version=14) # 11 for 10_6, 14 for Run 3
     _logger.info('ONNX model saved to %s', args.export_onnx)
 
     preprocessing_json = os.path.join(os.path.dirname(args.export_onnx), 'preprocess.json')
@@ -746,7 +745,33 @@ def model_setup(args, data_config):
         loss_func = torch.nn.CrossEntropyLoss()
         _logger.warning('Loss function not defined in %s. Will use `torch.nn.CrossEntropyLoss()` by default.',
                         args.network_config)
-    return model, model_info, loss_func
+    # train / evaluate loop implementation
+    try:
+        train = network_module.get_train_fn(data_config, **network_options)
+        evaluate = network_module.get_evaluate_fn(data_config, **network_options)
+        _logger.info('Using custom train/evaluate functions with options %s' % network_options)
+    except AttributeError:
+        # classification/regression mode
+        if args.train_mode == 'regression':
+            _logger.info('Running in regression mode')
+            from utils.nn.tools import train_regression as train
+            from utils.nn.tools import evaluate_regression as evaluate
+        elif args.train_mode == 'hybrid':
+            _logger.info('Running in hybrid mode')
+            from utils.nn.tools import train_hybrid as train
+            from utils.nn.tools import evaluate_hybrid as evaluate
+        elif args.train_mode == 'custom':
+            _logger.info('Running in customised mode')
+            from utils.nn.tools import train_custom as train
+            from utils.nn.tools import evaluate_custom as evaluate
+        else:
+            _logger.info('Running in classification mode')
+            from utils.nn.tools import train_classification as train
+            from utils.nn.tools import evaluate_classification as evaluate
+            if args.train_mode_params == 'metric:loss':
+                from functools import partial
+                evaluate = partial(evaluate, best_val_metrics='loss')
+    return model, model_info, loss_func, train, evaluate
 
 
 def iotest(args, data_loader):
@@ -846,29 +871,10 @@ def _main(args):
     if args.file_fraction < 1:
         _logger.warning('Use of `file-fraction` is not recommended in general -- prefer using `data-fraction` instead.')
 
-    # classification/regression mode
-    if args.train_mode == 'regression':
-        _logger.info('Running in regression mode')
-        from utils.nn.tools import train_regression as train
-        from utils.nn.tools import evaluate_regression as evaluate
-    elif args.train_mode == 'hybrid':
-        _logger.info('Running in hybrid mode')
-        from utils.nn.tools import train_hybrid as train
-        from utils.nn.tools import evaluate_hybrid as evaluate
-    elif args.train_mode == 'custom':
-        _logger.info('Running in customised mode')
-        from utils.nn.tools import train_custom as train
-        from utils.nn.tools import evaluate_custom as evaluate
-    else:
-        _logger.info('Running in classification mode')
-        from utils.nn.tools import train_classification as train
-        from utils.nn.tools import evaluate_classification as evaluate
-        if args.train_mode_params == 'metric:loss':
-            from functools import partial
-            evaluate = partial(evaluate, best_val_metrics='loss')
-
-    # training/testing mode
-    training_mode = not args.predict
+    if args.predict:
+        _logger.warning('The `--predict` flag is set. Overriding the `--run-mode` to `test`.')
+        args.run_mode = ['test']
+    training_mode = any(m in args.run_mode for m in ['train', 'val', 'train-only', 'val-only'])
 
     # device
     if args.gpus:
@@ -903,7 +909,7 @@ def _main(args):
         iotest(args, data_loader)
         return
 
-    model, model_info, loss_func = model_setup(args, data_config)
+    model, model_info, loss_func, train, evaluate = model_setup(args, data_config)
 
     # TODO: load checkpoint
     # if args.backend is not None:
@@ -968,7 +974,7 @@ def _main(args):
                     continue
             _logger.info('-' * 50)
 
-            if args.run_mode in ['default', 'train-only']:
+            if 'train' in args.run_mode or (len(args.run_mode) == 1 and args.run_mode[0] == 'train-only'): # preserve the original behavior
                 _logger.info('Epoch #%d training' % epoch)
                 train_loss = train(model, loss_func, opt, scheduler, train_loader, dev, epoch,
                     steps_per_epoch=args.steps_per_epoch, grad_scaler=grad_scaler, tb_helper=tb)
@@ -985,9 +991,9 @@ def _main(args):
                 # TODO: save checkpoint
                 #     save_checkpoint()
 
-            if args.run_mode in ['default', 'val-only']:
+            if 'val' in args.run_mode or (len(args.run_mode) == 1 and args.run_mode[0] == 'test-only'):
                 _logger.info('Epoch #%d validating' % epoch)
-                if args.run_mode == 'val-only':
+                if 'train' not in args.run_mode:
                     # check if the model to load exists
                     import time
                     while not os.path.exists(args.model_prefix + '_epoch-%d_state.pt' % epoch):
@@ -1029,7 +1035,7 @@ def _main(args):
                                 epoch, args.model_prefix + '_best_epoch_state.pt')
 
 
-    if args.data_test:
+    if 'test' in args.run_mode or args.run_mode == ['test-only']:
         if args.backend is not None and local_rank != 0:
             return
         if training_mode:
