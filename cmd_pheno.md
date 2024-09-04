@@ -2180,7 +2180,7 @@ config="$HOME/hww/incl-train/weaver-core/weaver/data_pheno/AD_fullspec/${PREFIX%
 
 run_weaver
 
-# 23.07 pheno2: try CLIP
+# 24.07 pheno2: try CLIP
 
 PREFIX=JetClassII_ak8puppi_full_scale_CLIP
 config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}.yaml
@@ -2209,3 +2209,100 @@ $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom --run-mode 
 --network-config $HOME/hww/incl-train/weaver-core/weaver/networks/pheno/example_ParticleTransformer2023_CLIP.py \
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
 --log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
+
+
+// for CLIP fine-tuning: add -o for_clip_finetune True
+
+PREFIX=JetClassII_ak8puppi_full_scale.CLIP_finetune
+config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}.yaml
+DATAFILE_MOD='/mldata/licq/datasets/JetClassII/train_higgs2p_ntuple/*[0-4].root /mldata/licq/datasets/JetClassII/train_higgspm2p_ntuple/*[0-4].root /mldata/licq/datasets/JetClassII/train_higgs4p_ntuple/*[0-4].root /mldata/licq/datasets/JetClassII/train_qcd_ntuple/*[0-4].root'
+DATAFILE='/mldata/licq/datasets/JetClassII/train_higgs2p_ntuple/*.root /mldata/licq/datasets/JetClassII/train_higgspm2p_ntuple/*.root /mldata/licq/datasets/JetClassII/train_higgs4p_ntuple/*.root /mldata/licq/datasets/JetClassII/train_qcd_ntuple/*.root'
+NGPUS=4
+
+load_model="$HOME/hww/incl-train/weaver-core/weaver/model/JetClassII_ak8puppi_full_scale_CLIP/net_epoch-79_state.pt"
+load_model_opts="--exclude-model-weights (mod_gen|mod_main\.(cls_token|cls_blocks|norm|fc)).* --optimizer-option lr_mult (\"mod_main\.(cls_token|cls_blocks|norm|fc).*\",10) --start-lr 2e-4"
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode cls \
+--use-amp -o for_clip_finetune True \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.01 \
+--load-model-weights ${load_model} ${load_model_opts} \
+--gpus 3 --data-train $DATAFILE_MOD \
+--samples-per-epoch $((10000 * 1024 / $NGPUS)) --samples-per-epoch-val $((2500 * 1024)) \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/pheno/example_ParticleTransformer2023_CLIP.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
+
+
+## add --data-split-group
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom \
+--use-amp \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.01 --data-split-group 4 \
+--gpus 3 --data-train $DATAFILE_MOD \
+--samples-per-epoch $((10000 * 1024 / $NGPUS)) --samples-per-epoch-val $((2500 * 1024)) \
+--data-config ${config} --num-workers 10 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/pheno/example_ParticleTransformer2023_CLIP.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net
+
+# official Sophon training (setting up official repo)
+
+PREFIX=JetClassII_ak8puppi_full_scale
+config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}.yaml
+DATAPATH='/mldata/licq/datasets/JetClassII/train_*_merged'
+NGPUS=4
+
+// pre-training
+python $HOME/hww/incl-train/weaver-core-hqu/weaver/train.py \
+--use-amp -o fc_params '[(512,0.1)]' \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.008 \
+--gpus 0 --data-train $DATAPATH'/*.root' \
+--samples-per-epoch $((10000 * 1024)) --samples-per-epoch-val $((1000 * 1024)) \
+--data-config ${config} --num-workers 6 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/pre_train.log
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS \
+$HOME/hww/incl-train/weaver-core/weaver/train.py --run-mode train-only \
+--use-amp -o fc_params '[(512,0.1)]' \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.01 \
+--backend nccl --data-train $DATAPATH'/*.root' \
+--samples-per-epoch $((10000 * 1024 / $NGPUS)) --samples-per-epoch-val $((2500 * 1024)) \
+--data-config ${config} --num-workers 6 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net \
+--log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
+
+./train_sophon.sh train --gpus 0 
+
+// infer the model with newest dataset and yaml config..
+
+config=data_pheno/JetClassIIformal_ak8puppi_full_scale.yaml # old weaver setting with latest dataset
+DATAFILE=/home/olympus/licq/datasets/JetClassII/Pythia/Res34P_1156.root
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
+--use-amp -o fc_params '[(512,0.1)]' \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.008 \
+--gpus 0 \
+--data-test $DATAFILE \
+--samples-per-epoch $((10000 * 1024)) --samples-per-epoch-val $((1000 * 1024)) \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/JetClassII_ak8puppi_full_scale/net_best_epoch_state.pt
+
+// then try prediction in the latest weaver-core and ParT file
+
+config=/home/pku/licq/pheno/anomdet/sophon/data/JetClassII/JetClassII_full.yaml
+DATAFILE=/home/olympus/licq/datasets/JetClassII/Pythia/Res34P_1156.root
+
+python $HOME/hww/incl-train/dev/weaver-core-hqu/weaver/train.py --predict \
+--use-amp -o fc_params '[(512,0.1)]' -o num_classes 188 \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.008 \
+--gpus 0 \
+--data-test $DATAFILE \
+--samples-per-epoch $((10000 * 1024)) --samples-per-epoch-val $((1000 * 1024)) \
+--data-config ${config} --num-workers 1 \
+--network-config networks/example_ParticleTransformer_sophon.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/JetClassII_ak8puppi_full_scale/net_best_epoch_state.pt

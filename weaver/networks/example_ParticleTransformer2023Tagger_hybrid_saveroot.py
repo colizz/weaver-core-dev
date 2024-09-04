@@ -123,3 +123,47 @@ def get_loss(data_config, **kwargs):
     gamma = kwargs.get('loss_gamma', 1)
     split_reg = kwargs.get('loss_split_reg', False)
     return HybridLoss(split_reg=split_reg, gamma=gamma)
+
+
+def get_save_fn(data_config, **kwargs):
+    return save_custom
+
+
+def save_custom(args, data_config, scores, labels, observers):
+    assert args.train_mode == 'hybrid'
+    selected_labels = [
+        "label_Top_bWcs", "label_Top_bWqq", "label_Top_bWc", "label_Top_bWs", "label_Top_bWq", "label_Top_bWev", "label_Top_bWmv", "label_Top_bWtauev", "label_Top_bWtaumv", "label_Top_bWtauhv", "label_Top_Wcs", "label_Top_Wqq", "label_Top_Wev", "label_Top_Wmv", "label_Top_Wtauev", "label_Top_Wtaumv", "label_Top_Wtauhv", "label_H_bb", "label_H_cc", "label_H_ss", "label_H_qq", "label_H_bc", "label_H_cs", "label_H_gg", "label_H_ee", "label_H_mm", "label_H_tauhtaue", "label_H_tauhtaum", "label_H_tauhtauh", "label_H_WW_cscs", "label_H_WW_csqq", "label_H_WW_qqqq", "label_H_WW_csc", "label_H_WW_css", "label_H_WW_csq", "label_H_WW_qqc", "label_H_WW_qqs", "label_H_WW_qqq", "label_H_WW_csev", "label_H_WW_qqev", "label_H_WW_csmv", "label_H_WW_qqmv", "label_H_WW_cstauev", "label_H_WW_qqtauev", "label_H_WW_cstaumv", "label_H_WW_qqtaumv", "label_H_WW_cstauhv", "label_H_WW_qqtauhv", 
+        "label_QCD_bb", "label_QCD_cc", "label_QCD_b", "label_QCD_c", "label_QCD_others"
+        ]
+
+    output = {}
+    scores_cls, scores_reg = scores
+    # write regression nodes
+    for idx in range(1, len(data_config.label_names)):
+        name = data_config.label_names[idx]
+        output[name] = labels[name]
+        if not data_config.split_per_cls:
+            output['output_' + name] = scores_reg[:, idx-1]
+        else:
+            for idx_cls, label_name in enumerate(data_config.label_value_cls_names):
+                if label_name not in selected_labels:
+                    continue
+                output['output_' + name + '_' + label_name] = scores_reg[:, (idx-1) * data_config.label_value_cls_num + idx_cls]
+    # write classification nodes
+    output['cls_index'] = labels['_label_'] # classes can be too many, only store the index
+    for idx, label_name in enumerate(data_config.label_value_cls_names):
+        if label_name not in selected_labels:
+            continue
+        output['score_' + label_name] = scores_cls[:, idx]
+
+    for k, v in labels.items():
+        if k == data_config.label_names[0]:
+            continue
+        assert v.ndim == 1
+        output[k] = v
+
+    for k, v in observers.items():
+        assert v.ndim == 1
+        output[k] = v
+
+    return output

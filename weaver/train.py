@@ -23,9 +23,8 @@ parser.add_argument('--train-mode', type=str, default='cls',
 parser.add_argument('--train-mode-params', type=str, default='',
                     choices=['', 'metric:loss'],
                     help='training mode parameters')
-parser.add_argument('--run-mode', type=str, default='default',
-                    choices=['default', 'train-only', 'val-only'],
-                    help='training mode')
+parser.add_argument('--run-mode', type=functools.partial(str.split, sep=','), default='train,val,test',
+                    help='comma-separated list of the steps (train|val|test) to run, e.g., `train,test`')
 parser.add_argument('--early-stop', action='store_true', default=False,
                     help='Early stop training if the validation metric does not improve for a few epochs')
 parser.add_argument('--early-stop-dlr', type=float, default=5e-4,
@@ -54,8 +53,10 @@ parser.add_argument('-t', '--data-test', nargs='*', default=[],
                          ' (c) split output per N input files, `--data-test a%10:/path/to/a/*`, will split per 10 input files')
 parser.add_argument('--data-fraction', type=float, default=1,
                     help='fraction of events to load from each file; for training, the events are randomly selected for each epoch')
+parser.add_argument('--data-split-num', type=int, default=1,
+                    help='for each dataloader worker, split its dataset further into N parts when loading a certain fraction of each file. Setting N > 1 can reduce the workers\' memory usage.')
 parser.add_argument('--data-split-group', type=int, default=1,
-                    help='number of groups to split the dataset when loading. This helps to mitigate the memory usage of dataloader when a number larger than 1 is specified')
+                    help='Old name for --data-split-num.')
 parser.add_argument('--file-fraction', type=float, default=1,
                     help='fraction of files to load; for training, the files are randomly selected for each epoch')
 parser.add_argument('--fetch-by-files', action='store_true', default=False,
@@ -92,6 +93,10 @@ parser.add_argument('-m', '--model-prefix', type=str, default='models/{auto}/net
                          'based on the timestamp and network configuration')
 parser.add_argument('--load-model-weights', type=str, default=None,
                     help='initialize model with pre-trained weights')
+parser.add_argument('--exclude-model-weights', type=str, default=None,
+                    help='comma-separated regex to exclude matched weights from being loaded, e.g., `a.fc..+,b.fc..+`')
+parser.add_argument('--freeze-model-weights', type=str, default=None,
+                    help='comma-separated regex to freeze matched weights from being updated in the training, e.g., `a.fc..+,b.fc..+`')
 parser.add_argument('--num-epochs', type=int, default=20,
                     help='number of epochs')
 parser.add_argument('--steps-per-epoch', type=int, default=None,
@@ -238,7 +243,7 @@ def train_load(args):
         _logger.info(train_files)
         _logger.info(val_files)
         args.data_fraction = 0.1
-        args.data_split_group = 1
+        args.data_split_num = 1
         args.fetch_step = 0.002
 
     if args.in_memory and (args.steps_per_epoch is None or args.steps_per_epoch_val is None):
@@ -246,7 +251,7 @@ def train_load(args):
 
     train_data = SimpleIterDataset(train_file_dict, args.data_config, for_training=True,
                                    extra_selection=args.extra_selection,
-                                   load_range_and_fraction=(train_range, args.data_fraction, args.data_split_group),
+                                   load_range_and_fraction=(train_range, args.data_fraction, args.data_split_num),
                                    file_fraction=args.file_fraction,
                                    fetch_by_files=args.fetch_by_files,
                                    fetch_step=args.fetch_step,
@@ -255,7 +260,7 @@ def train_load(args):
                                    name='train' + ('' if args.local_rank is None else '_rank%d' % args.local_rank))
     val_data = SimpleIterDataset(val_file_dict, args.data_config, for_training=True,
                                  extra_selection=args.extra_selection,
-                                 load_range_and_fraction=(val_range, args.data_fraction, args.data_split_group),
+                                 load_range_and_fraction=(val_range, args.data_fraction, args.data_split_num),
                                  file_fraction=args.file_fraction,
                                  fetch_by_files=args.fetch_by_files,
                                  fetch_step=args.fetch_step,
@@ -314,9 +319,9 @@ def test_load(args):
         _logger.info('Running on test file group %s with %d files:\n...%s', name, len(filelist), '\n...'.join(filelist))
         num_workers = min(args.num_workers, len(filelist))
         test_data = SimpleIterDataset({name: filelist}, args.data_config, for_training=False,
-                                      load_range_and_fraction=(tuple(args.test_range), args.data_fraction, args.data_split_group),
-                                    #   fetch_by_files=True, fetch_step=1,
-                                      fetch_by_files=False, fetch_step=0.01,
+                                      load_range_and_fraction=(tuple(args.test_range), args.data_fraction, args.data_split_num),
+                                      fetch_by_files=True, fetch_step=1,
+                                    #   fetch_by_files=False, fetch_step=0.05,
                                       name='test_' + name)
         test_loader = DataLoader(test_data, num_workers=num_workers, batch_size=args.batch_size, drop_last=False,
                                  pin_memory=True)
@@ -350,7 +355,7 @@ def onnx(args, model, data_config, model_info):
                       input_names=model_info['input_names'],
                       output_names=model_info['output_names'],
                       dynamic_axes=model_info.get('dynamic_axes', None),
-                      opset_version=11) # 11 for 10_6, 14 for Run 3
+                      opset_version=14) # 11 for 10_6, 14 for Run 3
     _logger.info('ONNX model saved to %s', args.export_onnx)
 
     preprocessing_json = os.path.join(os.path.dirname(args.export_onnx), 'preprocess.json')
@@ -366,7 +371,7 @@ def flops(model, model_info):
     :param model_info:
     :return:
     """
-    from utils.flops_counter import get_model_complexity_info
+    from utils.flops_counter2 import get_model_complexity_info
     import copy
 
     model = copy.deepcopy(model).cpu()
@@ -695,10 +700,45 @@ def model_setup(args, data_config):
                     print(f'Copy weight model params: {key}')
 
         else:
-            model_state = torch.load(args.load_model_weights, map_location='cpu')
+            # this is the default setup
+            if ':' in args.load_model_weights:
+                state_file, prefix = args.load_model_weights.split(':')
+                model_state = torch.load(state_file, map_location='cpu')
+                model_state = {k.replace(prefix + '.', '', 1): v for k,
+                            v in model_state.items() if k.startswith(prefix + '.')}
+
+            else:
+                model_state = torch.load(args.load_model_weights, map_location='cpu')
+            if args.exclude_model_weights:
+                import re
+                exclude_patterns = args.exclude_model_weights.split(',')
+                _logger.info('The following weights will not be loaded: %s' % str(exclude_patterns))
+                key_state = {}
+                for k in model_state.keys():
+                    key_state[k] = True
+                    for pattern in exclude_patterns:
+                        if re.match(pattern, k):
+                            key_state[k] = False
+                            break
+                model_state = {k: v for k, v in model_state.items() if key_state[k]}
             missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
             _logger.info('Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s' %
                         (args.load_model_weights, missing_keys, unexpected_keys))
+    if args.freeze_model_weights:
+        import re
+        freeze_patterns = args.freeze_model_weights.split(',')
+        for name, param in model.named_parameters():
+            freeze = False
+            for pattern in freeze_patterns:
+                if re.match(pattern, name):
+                    freeze = True
+                    break
+            if freeze:
+                param.requires_grad = False
+        _logger.info('The following weights has been frozen:\n - %s',
+                     '\n - '.join([name for name, p in model.named_parameters() if not p.requires_grad]),
+                     '\nThe following are not frozen:\n - %s',
+                     '\n - '.join([name for name, p in model.named_parameters() if p.requires_grad]))
     # _logger.info(model)
     flops(model, model_info)
     # loss function
@@ -709,7 +749,39 @@ def model_setup(args, data_config):
         loss_func = torch.nn.CrossEntropyLoss()
         _logger.warning('Loss function not defined in %s. Will use `torch.nn.CrossEntropyLoss()` by default.',
                         args.network_config)
-    return model, model_info, loss_func
+    # train / evaluate loop implementation
+    try:
+        train = network_module.get_train_fn(data_config, **network_options)
+        evaluate = network_module.get_evaluate_fn(data_config, **network_options)
+        _logger.info('Using custom train/evaluate functions with options %s' % network_options)
+    except AttributeError:
+        # classification/regression mode
+        if args.train_mode == 'regression':
+            _logger.info('Running in regression mode')
+            from utils.nn.tools import train_regression as train
+            from utils.nn.tools import evaluate_regression as evaluate
+        elif args.train_mode == 'hybrid':
+            _logger.info('Running in hybrid mode')
+            from utils.nn.tools import train_hybrid as train
+            from utils.nn.tools import evaluate_hybrid as evaluate
+        elif args.train_mode == 'custom':
+            _logger.info('Running in customised mode')
+            from utils.nn.tools import train_custom as train
+            from utils.nn.tools import evaluate_custom as evaluate
+        else:
+            _logger.info('Running in classification mode')
+            from utils.nn.tools import train_classification as train
+            from utils.nn.tools import evaluate_classification as evaluate
+            if args.train_mode_params == 'metric:loss':
+                from functools import partial
+                evaluate = partial(evaluate, best_val_metrics='loss')
+    # save file implementation
+    try:
+        save_fn = network_module.get_save_fn(data_config, **network_options)
+        _logger.info('Using custom save function with options %s' % network_options)
+    except AttributeError:
+        save_fn = None
+    return model, model_info, loss_func, train, evaluate, save_fn
 
 
 def iotest(args, data_loader):
@@ -737,7 +809,7 @@ def iotest(args, data_loader):
         _logger.info('Monitor info written to %s' % monitor_output_path)
 
 
-def save_root(args, output_path, data_config, scores, labels, observers):
+def save_root(args, output_path, data_config, scores, labels, observers, save_fn):
     """
     Saves as .root
     :param data_config:
@@ -747,6 +819,11 @@ def save_root(args, output_path, data_config, scores, labels, observers):
     :return:
     """
     from utils.data.fileio import _write_root
+    if save_fn is not None:
+        output = save_fn(args, data_config, scores, labels, observers)
+        _write_root(output_path, output)
+        return
+
     output = {}
     scores_cls, scores_reg = (scores, None) if args.train_mode == 'cls' else (None, scores) if args.train_mode == 'regression' else scores
     # write regression nodes
@@ -788,7 +865,7 @@ def save_root(args, output_path, data_config, scores, labels, observers):
     _write_root(output_path, output)
 
 
-def save_parquet(args, output_path, scores, labels, observers):
+def save_parquet(args, output_path, scores, labels, observers, save_fn):
     """
     Saves as parquet file
     :param scores:
@@ -809,29 +886,10 @@ def _main(args):
     if args.file_fraction < 1:
         _logger.warning('Use of `file-fraction` is not recommended in general -- prefer using `data-fraction` instead.')
 
-    # classification/regression mode
-    if args.train_mode == 'regression':
-        _logger.info('Running in regression mode')
-        from utils.nn.tools import train_regression as train
-        from utils.nn.tools import evaluate_regression as evaluate
-    elif args.train_mode == 'hybrid':
-        _logger.info('Running in hybrid mode')
-        from utils.nn.tools import train_hybrid as train
-        from utils.nn.tools import evaluate_hybrid as evaluate
-    elif args.train_mode == 'custom':
-        _logger.info('Running in customised mode')
-        from utils.nn.tools import train_custom as train
-        from utils.nn.tools import evaluate_custom as evaluate
-    else:
-        _logger.info('Running in classification mode')
-        from utils.nn.tools import train_classification as train
-        from utils.nn.tools import evaluate_classification as evaluate
-        if args.train_mode_params == 'metric:loss':
-            from functools import partial
-            evaluate = partial(evaluate, best_val_metrics='loss')
-
-    # training/testing mode
-    training_mode = not args.predict
+    if args.predict:
+        _logger.warning('The `--predict` flag is set. Overriding the `--run-mode` to `test`.')
+        args.run_mode = ['test']
+    training_mode = any(m in args.run_mode for m in ['train', 'val', 'train-only', 'val-only'])
 
     # device
     if args.gpus:
@@ -866,7 +924,7 @@ def _main(args):
         iotest(args, data_loader)
         return
 
-    model, model_info, loss_func = model_setup(args, data_config)
+    model, model_info, loss_func, train, evaluate, save_fn = model_setup(args, data_config)
 
     # TODO: load checkpoint
     # if args.backend is not None:
@@ -931,7 +989,7 @@ def _main(args):
                     continue
             _logger.info('-' * 50)
 
-            if args.run_mode in ['default', 'train-only']:
+            if 'train' in args.run_mode or (len(args.run_mode) == 1 and args.run_mode[0] == 'train-only'): # preserve the original behavior
                 _logger.info('Epoch #%d training' % epoch)
                 train_loss = train(model, loss_func, opt, scheduler, train_loader, dev, epoch,
                     steps_per_epoch=args.steps_per_epoch, grad_scaler=grad_scaler, tb_helper=tb)
@@ -948,9 +1006,9 @@ def _main(args):
                 # TODO: save checkpoint
                 #     save_checkpoint()
 
-            if args.run_mode in ['default', 'val-only']:
+            if 'val' in args.run_mode or (len(args.run_mode) == 1 and args.run_mode[0] == 'test-only'):
                 _logger.info('Epoch #%d validating' % epoch)
-                if args.run_mode == 'val-only':
+                if 'train' not in args.run_mode:
                     # check if the model to load exists
                     import time
                     while not os.path.exists(args.model_prefix + '_epoch-%d_state.pt' % epoch):
@@ -963,7 +1021,7 @@ def _main(args):
                                         steps_per_epoch=args.steps_per_epoch_val, tb_helper=tb)
                 # val_loader.dataset.restart_at_curr_pos()
                 is_best_epoch = (
-                    valid_metric < best_valid_metric) if args.train_mode in ['regression', 'hybrid'] or (args.train_mode == 'cls' and args.train_mode_params == 'metric:loss') else(
+                    valid_metric < best_valid_metric) if args.train_mode in ['regression', 'hybrid', 'custom'] or (args.train_mode == 'cls' and args.train_mode_params == 'metric:loss') else(
                     valid_metric > best_valid_metric)
                 if is_best_epoch:
                     best_valid_metric = valid_metric
@@ -992,7 +1050,7 @@ def _main(args):
                                 epoch, args.model_prefix + '_best_epoch_state.pt')
 
 
-    if args.data_test:
+    if 'test' in args.run_mode or args.run_mode == ['test-only']:
         if args.backend is not None and local_rank != 0:
             return
         if training_mode:
@@ -1040,9 +1098,9 @@ def _main(args):
                     base, ext = os.path.splitext(args.predict_output)
                     output_path = base + '_' + name + ext
                 if output_path.endswith('.root'):
-                    save_root(args, output_path, data_config, scores, labels, observers)
+                    save_root(args, output_path, data_config, scores, labels, observers, save_fn)
                 else:
-                    save_parquet(args, output_path, scores, labels, observers)
+                    save_parquet(args, output_path, scores, labels, observers, save_fn)
                 _logger.info('Written output to %s' % output_path, color='bold')
 
 
@@ -1065,6 +1123,8 @@ def main():
         args.steps_per_epoch_val = round(args.steps_per_epoch * (1 - args.train_val_split) / args.train_val_split)
     if args.steps_per_epoch_val is not None and args.steps_per_epoch_val < 0:
         args.steps_per_epoch_val = None
+
+    args.data_split_num = args.data_split_group
 
     if '{auto}' in args.model_prefix or '{auto}' in args.log_file:
         import hashlib

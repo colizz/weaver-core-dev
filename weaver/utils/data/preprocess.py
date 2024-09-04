@@ -272,6 +272,13 @@ class WeightMaker(object):
 
     def produce(self, output=None):
         table = self.read_file(self._filelist)
+        ## for debugging ##
+        # # write table:
+        # import pickle
+        # with open('table.pkl', 'wb') as f:
+        #     pickle.dump(table, f)
+        # with open('table.pkl', 'rb') as f:
+        #     table = pickle.load(f)
         wgts = self.make_weights(table)
         self._data_config.reweight_hists = wgts
         # must also propogate the changes to `data_config.options` so it can be persisted

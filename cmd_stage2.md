@@ -1858,6 +1858,14 @@ DATAPATH=/mldata/licq/deepjetak8
 PREFIX=ak8_finetune_stage2_topVsQCD_manual.aux256-256; network_name=finetune_stage2/mlp; ext_opt='-o ft_layer_params [(1024,0)] -o aux_layer_params [(256,0),(256,0)]'
 PREFIX=ak8_finetune_stage2_topVsQCD_manual.aux256-256.loadallparamsfreeze; network_name=finetune_stage2/mlp; ext_opt='-o ft_layer_params [(1024,0),(316,0)] -o concat_ft_layer 1 -o aux_layer_params [(256,0),(256,0)] --load-model-weights finetune_stage2.all --optimizer-option lr_mult ("ft_mlp.[01].*",1e-10)'
 
+// new test: not using sdmass
+NGPUS=1
+GPU=3
+DATAPATH=/home/olympus/licq/datasets/deepjetak8
+PREFIX=ak8_finetune_stage2_topVsQCD_usemass_manual.aux256-256; network_name=finetune_stage2/mlp; ext_opt='-o ft_layer_params [(1024,0)] -o aux_layer_params [(256,0),(256,0)]'
+PREFIX=ak8_finetune_stage2_topVsQCD_nosdmass_manual.aux256-256; network_name=finetune_stage2/mlp; ext_opt='-o ft_layer_params [(1024,0)] -o aux_layer_params [(256,0),(256,0)]'
+PREFIX=ak8_finetune_stage2_topVsQCD_noaux_manual.aux256-256; network_name=finetune_stage2/mlp; ext_opt='-o ft_layer_params [(1024,0)]'
+
 config=$HOME/hww/incl-train/weaver-core/weaver/data_new/finetune_stage2/top/${PREFIX%%.*}.yaml
 
 python $HOME/hww/incl-train/weaver-core/weaver/train.py \
