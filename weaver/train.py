@@ -53,8 +53,10 @@ parser.add_argument('-t', '--data-test', nargs='*', default=[],
                          ' (c) split output per N input files, `--data-test a%10:/path/to/a/*`, will split per 10 input files')
 parser.add_argument('--data-fraction', type=float, default=1,
                     help='fraction of events to load from each file; for training, the events are randomly selected for each epoch')
+parser.add_argument('--data-split-num', type=int, default=1,
+                    help='for each dataloader worker, split its dataset further into N parts when loading a certain fraction of each file. Setting N > 1 can reduce the workers\' memory usage.')
 parser.add_argument('--data-split-group', type=int, default=1,
-                    help='number of groups to split the dataset when loading. This helps to mitigate the memory usage of dataloader when a number larger than 1 is specified')
+                    help='Old name for --data-split-num.')
 parser.add_argument('--file-fraction', type=float, default=1,
                     help='fraction of files to load; for training, the files are randomly selected for each epoch')
 parser.add_argument('--fetch-by-files', action='store_true', default=False,
@@ -241,7 +243,7 @@ def train_load(args):
         _logger.info(train_files)
         _logger.info(val_files)
         args.data_fraction = 0.1
-        args.data_split_group = 1
+        args.data_split_num = 1
         args.fetch_step = 0.002
 
     if args.in_memory and (args.steps_per_epoch is None or args.steps_per_epoch_val is None):
@@ -249,7 +251,7 @@ def train_load(args):
 
     train_data = SimpleIterDataset(train_file_dict, args.data_config, for_training=True,
                                    extra_selection=args.extra_selection,
-                                   load_range_and_fraction=(train_range, args.data_fraction, args.data_split_group),
+                                   load_range_and_fraction=(train_range, args.data_fraction, args.data_split_num),
                                    file_fraction=args.file_fraction,
                                    fetch_by_files=args.fetch_by_files,
                                    fetch_step=args.fetch_step,
@@ -258,7 +260,7 @@ def train_load(args):
                                    name='train' + ('' if args.local_rank is None else '_rank%d' % args.local_rank))
     val_data = SimpleIterDataset(val_file_dict, args.data_config, for_training=True,
                                  extra_selection=args.extra_selection,
-                                 load_range_and_fraction=(val_range, args.data_fraction, args.data_split_group),
+                                 load_range_and_fraction=(val_range, args.data_fraction, args.data_split_num),
                                  file_fraction=args.file_fraction,
                                  fetch_by_files=args.fetch_by_files,
                                  fetch_step=args.fetch_step,
@@ -317,9 +319,9 @@ def test_load(args):
         _logger.info('Running on test file group %s with %d files:\n...%s', name, len(filelist), '\n...'.join(filelist))
         num_workers = min(args.num_workers, len(filelist))
         test_data = SimpleIterDataset({name: filelist}, args.data_config, for_training=False,
-                                      load_range_and_fraction=(tuple(args.test_range), args.data_fraction, args.data_split_group),
-                                    #   fetch_by_files=True, fetch_step=1,
-                                      fetch_by_files=False, fetch_step=0.05,
+                                      load_range_and_fraction=(tuple(args.test_range), args.data_fraction, args.data_split_num),
+                                      fetch_by_files=True, fetch_step=1,
+                                    #   fetch_by_files=False, fetch_step=0.05,
                                       name='test_' + name)
         test_loader = DataLoader(test_data, num_workers=num_workers, batch_size=args.batch_size, drop_last=False,
                                  pin_memory=True)
@@ -369,7 +371,7 @@ def flops(model, model_info):
     :param model_info:
     :return:
     """
-    from utils.flops_counter import get_model_complexity_info
+    from utils.flops_counter2 import get_model_complexity_info
     import copy
 
     model = copy.deepcopy(model).cpu()
@@ -734,7 +736,9 @@ def model_setup(args, data_config):
             if freeze:
                 param.requires_grad = False
         _logger.info('The following weights has been frozen:\n - %s',
-                     '\n - '.join([name for name, p in model.named_parameters() if not p.requires_grad]))
+                     '\n - '.join([name for name, p in model.named_parameters() if not p.requires_grad]),
+                     '\nThe following are not frozen:\n - %s',
+                     '\n - '.join([name for name, p in model.named_parameters() if p.requires_grad]))
     # _logger.info(model)
     flops(model, model_info)
     # loss function
@@ -771,7 +775,13 @@ def model_setup(args, data_config):
             if args.train_mode_params == 'metric:loss':
                 from functools import partial
                 evaluate = partial(evaluate, best_val_metrics='loss')
-    return model, model_info, loss_func, train, evaluate
+    # save file implementation
+    try:
+        save_fn = network_module.get_save_fn(data_config, **network_options)
+        _logger.info('Using custom save function with options %s' % network_options)
+    except AttributeError:
+        save_fn = None
+    return model, model_info, loss_func, train, evaluate, save_fn
 
 
 def iotest(args, data_loader):
@@ -799,7 +809,7 @@ def iotest(args, data_loader):
         _logger.info('Monitor info written to %s' % monitor_output_path)
 
 
-def save_root(args, output_path, data_config, scores, labels, observers):
+def save_root(args, output_path, data_config, scores, labels, observers, save_fn):
     """
     Saves as .root
     :param data_config:
@@ -809,6 +819,11 @@ def save_root(args, output_path, data_config, scores, labels, observers):
     :return:
     """
     from utils.data.fileio import _write_root
+    if save_fn is not None:
+        output = save_fn(args, data_config, scores, labels, observers)
+        _write_root(output_path, output)
+        return
+
     output = {}
     scores_cls, scores_reg = (scores, None) if args.train_mode == 'cls' else (None, scores) if args.train_mode == 'regression' else scores
     # write regression nodes
@@ -850,7 +865,7 @@ def save_root(args, output_path, data_config, scores, labels, observers):
     _write_root(output_path, output)
 
 
-def save_parquet(args, output_path, scores, labels, observers):
+def save_parquet(args, output_path, scores, labels, observers, save_fn):
     """
     Saves as parquet file
     :param scores:
@@ -909,7 +924,7 @@ def _main(args):
         iotest(args, data_loader)
         return
 
-    model, model_info, loss_func, train, evaluate = model_setup(args, data_config)
+    model, model_info, loss_func, train, evaluate, save_fn = model_setup(args, data_config)
 
     # TODO: load checkpoint
     # if args.backend is not None:
@@ -1006,7 +1021,7 @@ def _main(args):
                                         steps_per_epoch=args.steps_per_epoch_val, tb_helper=tb)
                 # val_loader.dataset.restart_at_curr_pos()
                 is_best_epoch = (
-                    valid_metric < best_valid_metric) if args.train_mode in ['regression', 'hybrid'] or (args.train_mode == 'cls' and args.train_mode_params == 'metric:loss') else(
+                    valid_metric < best_valid_metric) if args.train_mode in ['regression', 'hybrid', 'custom'] or (args.train_mode == 'cls' and args.train_mode_params == 'metric:loss') else(
                     valid_metric > best_valid_metric)
                 if is_best_epoch:
                     best_valid_metric = valid_metric
@@ -1083,9 +1098,9 @@ def _main(args):
                     base, ext = os.path.splitext(args.predict_output)
                     output_path = base + '_' + name + ext
                 if output_path.endswith('.root'):
-                    save_root(args, output_path, data_config, scores, labels, observers)
+                    save_root(args, output_path, data_config, scores, labels, observers, save_fn)
                 else:
-                    save_parquet(args, output_path, scores, labels, observers)
+                    save_parquet(args, output_path, scores, labels, observers, save_fn)
                 _logger.info('Written output to %s' % output_path, color='bold')
 
 
@@ -1108,6 +1123,8 @@ def main():
         args.steps_per_epoch_val = round(args.steps_per_epoch * (1 - args.train_val_split) / args.train_val_split)
     if args.steps_per_epoch_val is not None and args.steps_per_epoch_val < 0:
         args.steps_per_epoch_val = None
+
+    args.data_split_num = args.data_split_group
 
     if '{auto}' in args.model_prefix or '{auto}' in args.log_file:
         import hashlib

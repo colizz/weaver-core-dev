@@ -2245,7 +2245,7 @@ python $HOME/hww/incl-train/weaver-core/weaver/train.py --train-mode custom \
 --network-config $HOME/hww/incl-train/weaver-core/weaver/networks/pheno/example_ParticleTransformer2023_CLIP.py \
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/${PREFIX}/net
 
-# official Sophon training
+# official Sophon training (setting up official repo)
 
 PREFIX=JetClassII_ak8puppi_full_scale
 config=$HOME/hww/incl-train/weaver-core/weaver/data_pheno/${PREFIX%%.*}.yaml
@@ -2276,3 +2276,33 @@ $HOME/hww/incl-train/weaver-core/weaver/train.py --run-mode train-only \
 --log-file $HOME/hww/incl-train/weaver-core/weaver/logs/${PREFIX}/train.log --tensorboard _${PREFIX}
 
 ./train_sophon.sh train --gpus 0 
+
+// infer the model with newest dataset and yaml config..
+
+config=data_pheno/JetClassIIformal_ak8puppi_full_scale.yaml # old weaver setting with latest dataset
+DATAFILE=/home/olympus/licq/datasets/JetClassII/Pythia/Res34P_1156.root
+
+python $HOME/hww/incl-train/weaver-core/weaver/train.py --predict \
+--use-amp -o fc_params '[(512,0.1)]' \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.008 \
+--gpus 0 \
+--data-test $DATAFILE \
+--samples-per-epoch $((10000 * 1024)) --samples-per-epoch-val $((1000 * 1024)) \
+--data-config ${config} --num-workers 1 \
+--network-config $HOME/hww/incl-train/weaver-core/weaver/networks/example_ParticleTransformer2023.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/JetClassII_ak8puppi_full_scale/net_best_epoch_state.pt
+
+// then try prediction in the latest weaver-core and ParT file
+
+config=/home/pku/licq/pheno/anomdet/sophon/data/JetClassII/JetClassII_full.yaml
+DATAFILE=/home/olympus/licq/datasets/JetClassII/Pythia/Res34P_1156.root
+
+python $HOME/hww/incl-train/dev/weaver-core-hqu/weaver/train.py --predict \
+--use-amp -o fc_params '[(512,0.1)]' -o num_classes 188 \
+--batch-size 512 --start-lr 2e-3 --num-epochs 80 --optimizer ranger --fetch-step 0.008 \
+--gpus 0 \
+--data-test $DATAFILE \
+--samples-per-epoch $((10000 * 1024)) --samples-per-epoch-val $((1000 * 1024)) \
+--data-config ${config} --num-workers 1 \
+--network-config networks/example_ParticleTransformer_sophon.py \
+--model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/JetClassII_ak8puppi_full_scale/net_best_epoch_state.pt

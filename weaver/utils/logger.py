@@ -16,7 +16,7 @@ def _configLogger(name, stdout=sys.stdout, filename=None, loglevel=logging.INFO)
     if filename:
         dirname = os.path.dirname(filename)
         if dirname and not os.path.exists(dirname):
-            os.makedirs(os.path.dirname(filename))
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
         logfile = logging.FileHandler(filename)
         logfile.setLevel(loglevel)
         logfile.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s'))

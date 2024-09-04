@@ -3,8 +3,15 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import tqdm
+import time
 import numpy as np
 from weaver.utils.logger import _logger
+from weaver.utils.nn.tools import (
+    train_classification,
+    evaluate_regression,
+)
+
 from weaver.utils.import_tools import import_module
 
 _mod = import_module(os.path.join(os.path.dirname(__file__), '../ParticleTransformer2023.py'), 'ParT')
@@ -309,3 +316,188 @@ def get_loss(data_config, **kwargs):
         return CLIPLoss(beta=beta)
     else:
         return torch.nn.CrossEntropyLoss()
+
+
+def get_train_fn(data_config, **kwargs):
+    for_clip_finetune = kwargs.get('for_clip_finetune', False)
+    if not for_clip_finetune:
+        return train_custom_clip
+    else:
+        return train_classification
+
+
+def get_evaluate_fn(data_config, **kwargs):
+    for_clip_finetune = kwargs.get('for_clip_finetune', False)
+    if not for_clip_finetune:
+        return evaluate_custom_clip
+    else:
+        return evaluate_regression
+
+
+def train_custom_clip(model, loss_func, opt, scheduler, train_loader, dev, epoch, steps_per_epoch=None, grad_scaler=None, tb_helper=None):
+    model.train()
+
+    data_config = train_loader.dataset.config
+
+    num_batches = 0
+    count = 0
+    total_correct = 0
+    total_losses = None
+    start_time = time.time()
+    flag = False
+    with tqdm.tqdm(train_loader) as tq:
+        for X, _, _ in tq:
+            inputs = [X[k].to(dev) for k in data_config.input_names]
+            num_examples = inputs[0].shape[0]
+
+            opt.zero_grad()
+            model_output = model(*inputs)
+            if not isinstance(model_output, tuple):
+                model_output = (model_output,)
+            losses = loss_func(*model_output)
+            if not isinstance(losses, dict):
+                losses = {'loss': losses}
+            # print(losses)
+            if grad_scaler is None:
+                losses['loss'].backward()
+                opt.step()
+            else:
+                grad_scaler.scale(losses['loss']).backward()
+                grad_scaler.step(opt)
+                grad_scaler.update()
+
+            if scheduler and getattr(scheduler, '_update_per_step', False):
+                scheduler.step()
+
+            # also evaluate classification performance here
+            logits, label = model_output[0], model_output[1]
+            _, preds = logits.max(1)
+            correct = (preds == label).sum().item()
+            total_correct += correct
+
+            num_batches += 1
+            count += num_examples
+            if total_losses is None:
+                total_losses = {k: 0. for k in losses}
+            for k in losses:
+                losses[k] = losses[k].item()
+                total_losses[k] += losses[k]
+            tq.set_postfix({
+                'lr': '%.2e' % scheduler.get_last_lr()[0] if scheduler else opt.defaults['lr'],
+                'Acc': '%.5f' % (correct / num_examples),
+                **{k: '%.5f' % losses[k] for k in list(losses.keys())[:3]}
+            })
+
+            if tb_helper:
+                tb_helper.write_scalars(
+                    [
+                        ("lr/train", scheduler.get_last_lr()[0] if scheduler else opt.defaults['lr'], tb_helper.batch_train_count + num_batches),
+                        ("Acc/train", correct / num_examples, tb_helper.batch_train_count + num_batches)
+                    ] + 
+                    [(k + '/train', losses[k], tb_helper.batch_train_count + num_batches) for k in losses])
+                if tb_helper.custom_fn:
+                    with torch.no_grad():
+                        tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=num_batches, mode='train')
+
+            if steps_per_epoch is not None and num_batches >= steps_per_epoch:
+                break
+
+    time_diff = time.time() - start_time
+    _logger.info('Processed %d entries in total (avg. speed %.1f entries/s)' % (count, count / time_diff))
+    _logger.info('Train ' + ', '.join(['Avg_%s: %.5f' % (k, total_losses[k] / num_batches) for k in losses]))
+
+    if tb_helper:
+        tb_helper.write_scalars(
+            [("Acc/train (epoch)", total_correct / count, epoch)] +
+            [(k + '/train (epoch)', total_losses[k] / num_batches, epoch) for k in losses]
+            )
+        if tb_helper.custom_fn:
+            with torch.no_grad():
+                tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=-1, mode='train')
+
+        # update the batch state
+        tb_helper.batch_train_count += num_batches
+
+    if scheduler and not getattr(scheduler, '_update_per_step', False):
+        scheduler.step()
+
+
+def evaluate_custom_clip(model, test_loader, dev, epoch, for_training=True, loss_func=None, steps_per_epoch=None,
+                    eval_metrics=[], tb_helper=None):
+    model.eval()
+
+    data_config = test_loader.dataset.config
+
+    num_batches = 0
+    count = 0
+    total_correct = 0
+    total_losses = None
+    start_time = time.time()
+    with torch.no_grad():
+        with tqdm.tqdm(test_loader) as tq:
+            for X, y, Z in tq:
+                inputs = [X[k].to(dev) for k in data_config.input_names]
+                num_examples = inputs[0].shape[0]
+                model_output = model(*inputs)
+                if for_training:
+                    if not isinstance(model_output, tuple):
+                        model_output = (model_output,)
+                    losses = loss_func(*model_output)
+                else:
+                    losses = torch.Tensor([0.])
+                if not isinstance(losses, dict):
+                    losses = {'loss': losses}
+
+                # also evaluate classification performance here
+                logits, label = model_output[0], model_output[1]
+                _, preds = logits.max(1)
+                correct = (preds == label).sum().item()
+                total_correct += correct
+
+                num_batches += 1
+                count += num_examples
+                if total_losses is None:
+                    total_losses = {k: 0. for k in losses}
+                for k in losses:
+                    losses[k] = losses[k].item()
+                    total_losses[k] += losses[k]
+                tq.set_postfix({
+                    'Acc': '%.5f' % (correct / num_examples),
+                    **{k: '%.5f' % losses[k] for k in list(losses.keys())[:3]}
+                })
+
+                if tb_helper:
+                    if tb_helper.custom_fn:
+                        with torch.no_grad():
+                            tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=num_batches,
+                                                mode='eval' if for_training else 'test')
+
+                if steps_per_epoch is not None and num_batches >= steps_per_epoch:
+                    break
+
+    time_diff = time.time() - start_time
+    _logger.info('Processed %d entries in total (avg. speed %.1f entries/s)' % (count, count / time_diff))
+
+    # scores = np.concatenate(scores)
+    # labels = {k: _concat(v) for k, v in labels.items()}
+    # metric_results = evaluate_metrics(labels[data_config.label_names[0]], scores, eval_metrics=eval_metrics)
+    # _logger.info('Evaluation metrics: \n%s', '\n'.join(
+    #     ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results.items()]))
+
+    if tb_helper:
+        tb_mode = 'eval' if for_training else 'test'
+        tb_helper.write_scalars(
+            [("Acc/%s (epoch)" % tb_mode, total_correct / count, epoch)] + 
+            [(k + '/%s (epoch)' % tb_mode, total_losses[k] / num_batches, epoch) for k in losses]
+            )
+        if tb_helper.custom_fn:
+            with torch.no_grad():
+                tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=-1, mode=tb_mode)
+
+    if for_training:
+        return total_losses['loss'] / count
+    else:
+        # convert 2D labels/scores
+        # observers = {k: _concat(v) for k, v in observers.items()}
+        zeros = np.zeros_like(total_losses['loss'])
+        return total_losses['loss'] / count, zeros, zeros, {'k': zeros}
