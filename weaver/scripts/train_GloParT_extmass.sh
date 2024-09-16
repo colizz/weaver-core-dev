@@ -83,12 +83,33 @@ else
     exit 1
 fi
 
-echo "Run argument: $ARG"
-
 # if GPUS is an integer
 if [ $GPUS -eq $GPUS 2>/dev/null ]; then
-    python train.py --gpus $GPUS $ARG $cmdlineopts
+    cmd="python train.py --gpus $GPUS $ARG $cmdlineopts "
 else
     # GPU list is separated by comma
-    CUDA_VISIBLE_DEVICES=$GPUS torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS train.py --backend nccl $ARG $cmdlineopts
+    export CUDA_VISIBLE_DEVICES=$GPUS
+    cmd="torchrun --standalone --nnodes=1 --nproc_per_node=$NGPUS train.py --backend nccl $ARG $cmdlineopts "
 fi
+
+echo Run command: $cmd
+
+# if the training is halted, resume from the last epoch
+epochopts=""
+while true; do
+    $cmd $epochopts
+    ret=$?
+    if [ $ret -eq 0 ]; then
+        break
+    fi
+    echo "Error: return code $ret"
+    # match model/${PREFIX}/net/net_epoch-(\d+)_state.pt and extract the maximum epoch number
+    maxepoch=$(ls model/${PREFIX}/net_epoch-*.pt | sed -n s/.*net_epoch-\([0-9]*\)_state.pt/\1/p | sort -n | tail -n 1)
+    if [ -z $maxepoch ]; then
+        epochopts=""
+    else
+        epochopts="--load-epoch $maxepoch"
+        echo "Resuming from epoch $maxepoch"
+    fi
+    sleep 10
+done

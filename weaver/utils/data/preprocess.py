@@ -6,7 +6,7 @@ import awkward as ak
 
 from ..logger import _logger
 from .tools import _get_variable_names, _eval_expr
-from .fileio import _read_files
+from .fileio import _read_files, _read_files_concurrent
 
 
 def _apply_selection(table, selection):

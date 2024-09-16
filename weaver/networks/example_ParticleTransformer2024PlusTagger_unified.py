@@ -24,12 +24,25 @@ class GlobalParticleTransformerWrapper(ParticleTransformerTagger_ncoll):
     def __init__(self, *args, **kwargs) -> None:
 
         use_external_fc = kwargs.pop('use_external_fc', False)
+        freeze_main_params = kwargs.pop('freeze_main_params', False)
         self.input_highlevel_dim = kwargs.pop('input_highlevel_dim', 0)
+        self.for_inference = kwargs['for_inference']
 
         if use_external_fc:
             fc_params = kwargs.get('fc_params', None)
-            kwargs.update(fc_params=None) # remove the default FC layer so that the ParT model will just output the last embed layer
+            kwargs['fc_params'] = None  # remove the default FC layer so that the ParT model will just output the last embed layer
             super().__init__(*args, **kwargs)
+            
+            # when doing transfer learning (freezing the entire ParT), 
+            # it is crucial to freeze the running stats of all batch norm layers
+            if freeze_main_params:
+                for params in self.parameters():
+                    params.requires_grad_(False)
+                for m in self.modules():
+                    if isinstance(m, nn.BatchNorm1d) or isinstance(m, nn.BatchNorm2d):
+                        m.eval()
+                        m.requires_grad_(False)
+                        m.track_running_stats = False
 
             if fc_params is not None:
                 fcs = []
@@ -50,10 +63,13 @@ class GlobalParticleTransformerWrapper(ParticleTransformerTagger_ncoll):
         if self.fc is not None:
             if self.input_highlevel_dim > 0:
                 x = super().forward(*args[:-1])
-                x = torch.cat([x, args[-1]], dim=1)
+                x = torch.cat([x, args[-1].squeeze(2)], dim=1)
             else:
                 x = super().forward(*args)
-            return self.fc(x)
+            output = self.fc(x)
+            if self.for_inference:
+                output = torch.softmax(output, dim=1)
+            return output
         else:
             return super().forward(*args)
 
@@ -96,6 +112,7 @@ def get_model(data_config, **kwargs):
 
     kwargs.pop('loss_gamma') # must-have argument
     kwargs.pop('loss_split_reg', False)
+    kwargs.pop('loss_composed_split_reg', None)
     kwargs.pop('three_coll', False) # v2 setup, not used for v3
     if kwargs.pop('use_swiglu_config', False):
         cfg.update(
@@ -176,6 +193,37 @@ class HybridLoss(torch.nn.Module):
         return loss, loss_dict
 
 
+class ComposedHybridLoss(torch.nn.Module):
+
+    def __init__(self, reduction='mean', composed_split_reg=None, gamma=1.):
+        unifd, split = composed_split_reg
+        # unifd, split: lists of True/False for each regression target. True means using this regression target
+        assert any(unifd) and any(split), 'At least one regression target must be used for unified and split regression'
+
+        super().__init__()
+        self.loss_cls_fn = torch.nn.CrossEntropyLoss()
+        self.loss_reg_unifd_fn = LogCoshLoss(reduction=reduction, split_reg=False)
+        self.loss_reg_split_fn = LogCoshLoss(reduction=reduction, split_reg=True)
+        self.unifd = unifd
+        self.split = split
+        self.num_unifd = sum(unifd)
+        self.gamma = gamma
+
+    def forward(self, input_cls, input_reg, target_cls, target_reg):
+
+        loss_cls = self.loss_cls_fn(input_cls, target_cls)
+
+        # compute unified regression loss
+        n_target_reg = target_reg.shape[1]
+        loss_reg_unifd = self.loss_reg_unifd_fn(input_reg[:, :self.num_unifd], target_reg[:, self.unifd])
+
+        # compute split-class regression loss. Only do split-class regression for specific targets defined by composed_split_reg
+        loss_reg_split = self.loss_reg_split_fn(input_reg[:, self.num_unifd:], target_reg[:, self.split], target_cls=target_cls, n_cls=input_cls.shape[1])
+        loss = loss_cls + self.gamma * (loss_reg_unifd.sum() + loss_reg_split.sum())
+        loss_dict = {'cls': loss_cls.item(), 'reg_unifd': loss_reg_unifd.sum().item(), 'reg_split': loss_reg_split.sum().item(), 'reg': loss_reg_unifd.sum().item() + loss_reg_split.sum().item()}
+        return loss, loss_dict
+
+
 class CrossEntropyLoss(torch.nn.CrossEntropyLoss):
     def forward(self, input_cls, input_reg, target_cls, target_reg):
         loss = super().forward(input_cls, target_cls)
@@ -185,10 +233,14 @@ class CrossEntropyLoss(torch.nn.CrossEntropyLoss):
 def get_loss(data_config, **kwargs):
     gamma = kwargs.get('loss_gamma', 1)
     split_reg = kwargs.get('loss_split_reg', False)
+    composed_split_reg = kwargs.get('loss_composed_split_reg', None)
     if gamma == 0:
         return CrossEntropyLoss()
     else:
-        return HybridLoss(split_reg=split_reg, gamma=gamma)
+        if composed_split_reg is None:
+            return HybridLoss(split_reg=split_reg, gamma=gamma)
+        else:
+            return ComposedHybridLoss(composed_split_reg=composed_split_reg, gamma=gamma)
 
 
 def get_train_fn(data_config, **kwargs):
@@ -215,6 +267,8 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
     total_loss_cls = 0
     total_loss_reg = 0
     total_loss_reg_i = defaultdict(float)
+    total_loss_reg_split = 0
+    total_loss_reg_unifd = 0
     num_batches = 0
     total_correct = 0
     sum_abs_err = 0
@@ -267,20 +321,24 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
             total_loss += loss
             total_loss_cls += loss_monitor['cls']
             total_loss_reg += loss_monitor['reg']
-            if n_reg_target > 1:
+            if 'reg_split' in loss_monitor:
+                total_loss_reg_split += loss_monitor['reg_split']
+                total_loss_reg_unifd += loss_monitor['reg_unifd']
+            elif n_reg_target > 1:
                 for i in range(n_reg_target):
                     total_loss_reg_i[i] += loss_monitor[f'reg_{i}']
             total_correct += correct
 
-            if len(data_config.label_names) > 1:
-                e = preds_reg - label_reg
-                abs_err = e.abs().sum().item()
-                sum_abs_err += abs_err
-                sqr_err = e.square().sum().item()
-                sum_sqr_err += sqr_err
-            else:
-                abs_err = 0
-                sqr_err = 0
+            ## not adapted for composed regression loss
+            # if len(data_config.label_names) > 1:
+            #     e = preds_reg - label_reg
+            #     abs_err = e.abs().sum().item()
+            #     sum_abs_err += abs_err
+            #     sqr_err = e.square().sum().item()
+            #     sum_sqr_err += sqr_err
+            # else:
+            #     abs_err = 0
+            #     sqr_err = 0
 
             tq.set_postfix({
                 'lr': '%.2e' % scheduler.get_last_lr()[0] if scheduler else opt.defaults['lr'],
@@ -303,10 +361,15 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
                     ("LossReg/train", loss_monitor['reg'], tb_helper.batch_train_count + num_batches),
                     # ("LossTot/train", loss, tb_helper.batch_train_count + num_batches),
                     ("Acc/train", correct / num_examples, tb_helper.batch_train_count + num_batches),
-                    ("MSE/train", sqr_err / num_examples, tb_helper.batch_train_count + num_batches),
+                    # ("MSE/train", sqr_err / num_examples, tb_helper.batch_train_count + num_batches),
                     # ("MAE/train", abs_err / num_examples, tb_helper.batch_train_count + num_batches),
                     ])
-                if n_reg_target > 1:
+                if 'reg_split' in loss_monitor:
+                    tb_helper.write_scalars([
+                        ("LossRegSplit/train", loss_monitor['reg_split'], tb_helper.batch_train_count + num_batches),
+                        ("LossRegUnifd/train", loss_monitor['reg_unifd'], tb_helper.batch_train_count + num_batches),
+                        ])
+                elif n_reg_target > 1:
                     for i in range(n_reg_target):
                         tb_helper.write_scalars([
                             (f"LossReg{i}/train", loss_monitor[f'reg_{i}'], tb_helper.batch_train_count + num_batches),
@@ -320,9 +383,9 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
 
     time_diff = time.time() - start_time
     _logger.info('Processed %d entries in total (avg. speed %.1f entries/s)' % (count, count / time_diff))
-    _logger.info('Train AvgLoss: %.5f, AvgLossReg: %.5f, AvgLossTot: %.5f, AvgAcc: %.5f, AvgMSE: %.5f, AvgMAE: %.5f' %
+    _logger.info('Train AvgLoss: %.5f, AvgLossReg: %.5f, AvgLossTot: %.5f, AvgAcc: %.5f' %
                  (total_loss_cls / num_batches, total_loss_reg / num_batches, total_loss / num_batches,
-                 total_correct / count, sum_sqr_err / count, sum_abs_err / count))
+                 total_correct / count))
     _logger.info('Train class distribution: \n    %s', str(sorted(label_counter.items())))
 
     if tb_helper:
@@ -331,10 +394,15 @@ def train_hybrid(model, loss_func, opt, scheduler, train_loader, dev, epoch, ste
             ("LossReg/train (epoch)", total_loss_reg / num_batches, epoch),
             ("LossTot/train (epoch)", total_loss / num_batches, epoch),
             ("Acc/train (epoch)", total_correct / count, epoch),
-            ("MSE/train (epoch)", sum_sqr_err / count, epoch),
-            ("MAE/train (epoch)", sum_abs_err / count, epoch),
+            # ("MSE/train (epoch)", sum_sqr_err / count, epoch),
+            # ("MAE/train (epoch)", sum_abs_err / count, epoch),
             ])
-        if n_reg_target > 1:
+        if 'reg_split' in loss_monitor:
+            tb_helper.write_scalars([
+                ("LossRegSplit/train (epoch)", total_loss_reg_split / num_batches, epoch),
+                ("LossRegUnifd/train (epoch)", total_loss_reg_unifd / num_batches, epoch),
+                ])
+        elif n_reg_target > 1:
             for i in range(n_reg_target):
                 tb_helper.write_scalars([
                     (f"LossReg{i}/train (epoch)", total_loss_reg_i[i] / num_batches, epoch),
@@ -362,6 +430,9 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
     total_loss = 0
     total_loss_cls = 0
     total_loss_reg = 0
+    total_loss_reg_i = defaultdict(float)
+    total_loss_reg_split = 0
+    total_loss_reg_unifd = 0
     num_batches = 0
     total_correct = 0
     entry_count = 0
@@ -396,6 +467,7 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
                     label_reg = None
                 n_reg_target = len(data_config.label_names) - 1
 
+                # with torch.autograd.detect_anomaly():
                 model_output = model(*inputs)
                 # ## a temporary hack: save the embeded space
                 # model_output, model_embed_output = model(*inputs, return_embed=True)
@@ -428,16 +500,23 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
                 total_loss += loss * num_examples
                 total_loss_cls += loss_monitor['cls'] * num_examples
                 total_loss_reg += loss_monitor['reg'] * num_examples
+                if 'reg_split' in loss_monitor:
+                    total_loss_reg_split += loss_monitor['reg_split'] * num_examples
+                    total_loss_reg_unifd += loss_monitor['reg_unifd'] * num_examples
+                elif n_reg_target > 1:
+                    for i in range(n_reg_target):
+                        total_loss_reg_i[i] += loss_monitor[f'reg_{i}'] * num_examples
 
-                if len(data_config.label_names) > 1:
-                    e = preds_reg - label_reg
-                    abs_err = e.abs().sum().item()
-                    sum_abs_err += abs_err
-                    sqr_err = e.square().sum().item()
-                    sum_sqr_err += sqr_err
-                else:
-                    abs_err = 0
-                    sqr_err = 0
+                ## not adapted for composed regression loss
+                # if len(data_config.label_names) > 1:
+                #     e = preds_reg - label_reg
+                #     abs_err = e.abs().sum().item()
+                #     sum_abs_err += abs_err
+                #     sqr_err = e.square().sum().item()
+                #     sum_sqr_err += sqr_err
+                # else:
+                #     abs_err = 0
+                #     sqr_err = 0
 
                 tq.set_postfix({
                     'Loss': '%.5f' % loss_monitor['cls'],
@@ -446,10 +525,10 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
                     'AvgLoss': '%.5f' % (total_loss / count),
                     'Acc': '%.5f' % (correct / num_examples),
                     'AvgAcc': '%.5f' % (total_correct / count),
-                    'MSE': '%.5f' % (sqr_err / num_examples),
-                    'AvgMSE': '%.5f' % (sum_sqr_err / count),
-                    'MAE': '%.5f' % (abs_err / num_examples),
-                    'AvgMAE': '%.5f' % (sum_abs_err / count),
+                    # 'MSE': '%.5f' % (sqr_err / num_examples),
+                    # 'AvgMSE': '%.5f' % (sum_sqr_err / count),
+                    # 'MAE': '%.5f' % (abs_err / num_examples),
+                    # 'AvgMAE': '%.5f' % (sum_abs_err / count),
                 })
 
                 if tb_helper:
@@ -472,9 +551,19 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
             ("LossReg/%s (epoch)" % tb_mode, total_loss_reg / count, epoch),
             ("LossTot/%s (epoch)" % tb_mode, total_loss / count, epoch),
             ("Acc/%s (epoch)" % tb_mode, total_correct / count, epoch),
-            ("MSE/%s (epoch)" % tb_mode, sum_sqr_err / count, epoch),
-            ("MAE/%s (epoch)" % tb_mode, sum_abs_err / count, epoch),
+            # ("MSE/%s (epoch)" % tb_mode, sum_sqr_err / count, epoch),
+            # ("MAE/%s (epoch)" % tb_mode, sum_abs_err / count, epoch),
             ])
+        if 'reg_split' in loss_monitor:
+            tb_helper.write_scalars([
+                ("LossRegSplit/%s (epoch)" % tb_mode, total_loss_reg_split / count, epoch),
+                ("LossRegUnifd/%s (epoch)" % tb_mode, total_loss_reg_unifd / count, epoch),
+                ])
+        elif n_reg_target > 1:
+            for i in range(n_reg_target):
+                tb_helper.write_scalars([
+                    (f"LossReg{i}/{tb_mode} (epoch)", total_loss_reg_i[i] / count, epoch),
+                    ])
         if tb_helper.custom_fn:
             with torch.no_grad():
                 tb_helper.custom_fn(model_output=model_output, model=model, epoch=epoch, i_batch=-1, mode=tb_mode)
@@ -505,12 +594,16 @@ def save_custom(args, data_config, scores, labels, observers):
     import ast
     network_options = {k: ast.literal_eval(v) for k, v in args.network_option}
     label_cls_nodes = network_options.get('label_cls_nodes', None)
+    label_stored = network_options.get('label_stored', None)
     assert label_cls_nodes is not None, 'label_cls_nodes must be provided as a network option in the test mode'
 
-    stored_labels = [
-        "label_Top_bWcs", "label_Top_bWqq", "label_Top_bWc", "label_Top_bWs", "label_Top_bWq", "label_Top_bWev", "label_Top_bWmv", "label_Top_bWtauev", "label_Top_bWtaumv", "label_Top_bWtauhv", "label_Top_Wcs", "label_Top_Wqq", "label_Top_Wev", "label_Top_Wmv", "label_Top_Wtauev", "label_Top_Wtaumv", "label_Top_Wtauhv", "label_H_bb", "label_H_cc", "label_H_ss", "label_H_qq", "label_H_bc", "label_H_cs", "label_H_gg", "label_H_ee", "label_H_mm", "label_H_tauhtaue", "label_H_tauhtaum", "label_H_tauhtauh", "label_H_WW_cscs", "label_H_WW_csqq", "label_H_WW_qqqq", "label_H_WW_csc", "label_H_WW_css", "label_H_WW_csq", "label_H_WW_qqc", "label_H_WW_qqs", "label_H_WW_qqq", "label_H_WW_csev", "label_H_WW_qqev", "label_H_WW_csmv", "label_H_WW_qqmv", "label_H_WW_cstauev", "label_H_WW_qqtauev", "label_H_WW_cstaumv", "label_H_WW_qqtaumv", "label_H_WW_cstauhv", "label_H_WW_qqtauhv", 
-        "label_QCD_bb", "label_QCD_cc", "label_QCD_b", "label_QCD_c", "label_QCD_others"
-        ]
+    if label_stored is None:
+        label_stored = [
+            "label_Top_bWcs", "label_Top_bWqq", "label_Top_bWc", "label_Top_bWs", "label_Top_bWq", "label_Top_bWev", "label_Top_bWmv", "label_Top_bWtauev", "label_Top_bWtaumv", "label_Top_bWtauhv", "label_Top_Wcs", "label_Top_Wqq", "label_Top_Wev", "label_Top_Wmv", "label_Top_Wtauev", "label_Top_Wtaumv", "label_Top_Wtauhv", "label_H_bb", "label_H_cc", "label_H_ss", "label_H_qq", "label_H_bc", "label_H_cs", "label_H_gg", "label_H_ee", "label_H_mm", "label_H_tauhtaue", "label_H_tauhtaum", "label_H_tauhtauh", "label_H_WW_cscs", "label_H_WW_csqq", "label_H_WW_qqqq", "label_H_WW_csc", "label_H_WW_css", "label_H_WW_csq", "label_H_WW_qqc", "label_H_WW_qqs", "label_H_WW_qqq", "label_H_WW_csev", "label_H_WW_qqev", "label_H_WW_csmv", "label_H_WW_qqmv", "label_H_WW_cstauev", "label_H_WW_qqtauev", "label_H_WW_cstaumv", "label_H_WW_qqtaumv", "label_H_WW_cstauhv", "label_H_WW_qqtauhv", 
+            "label_H_WxWx_cscs", "label_H_WxWx_csqq", "label_H_WxWx_qqqq", "label_H_WxWx_csc", "label_H_WxWx_css", "label_H_WxWx_csq", "label_H_WxWx_qqc", "label_H_WxWx_qqs", "label_H_WxWx_qqq", "label_H_WxWx_csev", "label_H_WxWx_qqev", "label_H_WxWx_csmv", "label_H_WxWx_qqmv", "label_H_WxWx_cstauev", "label_H_WxWx_qqtauev", "label_H_WxWx_cstaumv", "label_H_WxWx_qqtaumv", "label_H_WxWx_cstauhv", "label_H_WxWx_qqtauhv", 
+            "label_H_WxWxStar_cscs", "label_H_WxWxStar_csqq", "label_H_WxWxStar_qqqq", "label_H_WxWxStar_csc", "label_H_WxWxStar_css", "label_H_WxWxStar_csq", "label_H_WxWxStar_qqc", "label_H_WxWxStar_qqs", "label_H_WxWxStar_qqq", "label_H_WxWxStar_csev", "label_H_WxWxStar_qqev", "label_H_WxWxStar_csmv", "label_H_WxWxStar_qqmv", "label_H_WxWxStar_cstauev", "label_H_WxWxStar_qqtauev", "label_H_WxWxStar_cstaumv", "label_H_WxWxStar_qqtaumv", "label_H_WxWxStar_cstauhv", "label_H_WxWxStar_qqtauhv", 
+            "label_QCD_bb", "label_QCD_cc", "label_QCD_b", "label_QCD_c", "label_QCD_others"
+            ]
 
     output = {}
     scores_cls, scores_reg = scores
@@ -522,13 +615,13 @@ def save_custom(args, data_config, scores, labels, observers):
             output['output_' + name] = scores_reg[:, idx-1]
         else:
             for idx_cls, label_name in enumerate(label_cls_nodes):
-                if label_name not in stored_labels:
+                if label_name not in label_stored:
                     continue
                 output['output_' + name + '_' + label_name] = scores_reg[:, (idx-1) * len(label_cls_nodes) + idx_cls]
     # write classification nodes
     output['cls_index'] = labels['truth_label'] # classes can be too many, only store the index
     for idx, label_name in enumerate(label_cls_nodes):
-        if label_name not in stored_labels:
+        if label_name not in label_stored:
             continue
         output['score_' + label_name] = scores_cls[:, idx]
 

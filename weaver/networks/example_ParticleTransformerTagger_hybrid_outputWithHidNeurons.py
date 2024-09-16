@@ -334,7 +334,7 @@ class Block(nn.Module):
             tgt_len, bsz = x.size(0), x.size(1)
             x = x.view(tgt_len, bsz, self.num_heads, self.head_dim)
             # x = torch.einsum('tbhd,h->tbdh', x, self.c_attn)
-             v
+            x = x.permute(0, 1, 3, 2) * self.c_attn.reshape(1, 1, 1, -1)  # rewrite einsum
             x = x.reshape(tgt_len, bsz, self.embed_dim)
         if self.post_attn_norm is not None:
             x = self.post_attn_norm(x)

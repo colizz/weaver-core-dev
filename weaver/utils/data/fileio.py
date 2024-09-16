@@ -328,7 +328,49 @@ def _read_files(filelist, branches, load_ranges=None, show_progressbar=False, **
             table.append(a)
     table = _concat(table)  # ak.Array
     if len(table) == 0:
-        raise RuntimeError(f'Zero entries loaded when reading files {filelist} with `load_range`={load_range}.')
+        raise RuntimeError(f'Zero entries loaded when reading files {filelist} with `load_ranges`={load_ranges}.')
+    return table
+
+
+def _read_files_concurrent(filelist, branches, load_ranges=None, show_progressbar=False, **kwargs):
+    import concurrent.futures
+    from tqdm import tqdm
+    import os
+    branches = list(branches)
+    table = []
+    args_list = []
+    for i_file, filepath in enumerate(filelist):
+        args_list.append((filepath, branches, None if load_ranges is None else load_ranges[i_file]))
+    
+    def _read_file(args):
+        filepath, branches, load_range = args
+        ext = os.path.splitext(filepath)[1]
+        if ext not in ('.h5', '.root', '.awkd', '.parquet'):
+            raise RuntimeError('File %s of type `%s` is not supported!' % (filepath, ext))
+        try:
+            if ext == '.h5':
+                a = _read_hdf5(filepath, branches, load_range=load_range)
+            elif ext == '.root':
+                a = _read_root(filepath, branches, load_range=load_range, treename=kwargs.get('treename', None))
+            elif ext == '.awkd':
+                a = _read_awkd(filepath, branches, load_range=load_range)
+            elif ext == '.parquet':
+                a = _read_parquet(filepath, branches, load_range=load_range)
+        except Exception as e:
+            a = None
+            _logger.error('When reading file %s:', filepath)
+            _logger.error(traceback.format_exc())
+        return a
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(_read_file, args) for args in args_list]
+        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
+            table.append(future.result())
+    
+    table = [a for a in table if a is not None]
+    table = _concat(table)  # ak.Array
+    if len(table) == 0:
+        raise RuntimeError(f'Zero entries loaded when reading files {filelist} with `load_ranges`={load_ranges}.')
     return table
 
 

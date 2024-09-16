@@ -735,10 +735,9 @@ def model_setup(args, data_config):
                     break
             if freeze:
                 param.requires_grad = False
-        _logger.info('The following weights has been frozen:\n - %s',
-                     '\n - '.join([name for name, p in model.named_parameters() if not p.requires_grad]),
-                     '\nThe following are not frozen:\n - %s',
-                     '\n - '.join([name for name, p in model.named_parameters() if p.requires_grad]))
+        _logger.info('The following weights has been frozen:\n - %s\nThe following are not frozen:\n - %s' % (
+            '\n - '.join([name for name, p in model.named_parameters() if not p.requires_grad]),
+            '\n - '.join([name for name, p in model.named_parameters() if p.requires_grad])))
     # _logger.info(model)
     flops(model, model_info)
     # loss function
