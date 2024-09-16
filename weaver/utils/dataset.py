@@ -190,15 +190,15 @@ class _SimpleIter(object):
             for i_load in range(math.ceil((self.load_range[1] - self.load_range[0]) / self._fetch_step)):
                 start_pos = self.load_range[0] + i_load * self._fetch_step
                 delta = min(self._fetch_step, self.load_range[1] - start_pos)
-                for d in range(self.split_num):
-                    # the dth split of the ith iteration loading range (start_pos, end_pos)
-                    _files, _ranges = [], []
-                    for _, files in self.file_dict.items():
-                        n_files = len(files)
-                        n_div_d_sep_array = n_div_d_sep(n_files, self.split_num)
-                        _files.extend([files[i] for i in range(n_files) if n_div_d_sep_array[d + 1, i] - n_div_d_sep_array[d, i] > 0])
-                        _ranges.extend([(start_pos + delta * n_div_d_sep_array[d, i], start_pos + delta * n_div_d_sep_array[d + 1, i]) for i in range(n_files) if n_div_d_sep_array[d + 1, i] - n_div_d_sep_array[d, i] > 0])
-                    self.load_filelist_and_ranges.append((_files, _ranges))
+                _load_filelist_and_ranges = [[[], []] for _ in range(self.split_num)]
+                for name, files in self.file_dict.items():
+                    n_files = len(files)
+                    n_div_d_sep_array = n_div_d_sep(n_files, self.split_num)
+                    for d in range(self.split_num):
+                        # the dth split of the ith iteration loading range (start_pos, end_pos)
+                        _load_filelist_and_ranges[d][0] += [files[i] for i in range(n_files) if n_div_d_sep_array[d + 1, i] - n_div_d_sep_array[d, i] > 0]
+                        _load_filelist_and_ranges[d][1] += [(start_pos + delta * n_div_d_sep_array[d, i], start_pos + delta * n_div_d_sep_array[d + 1, i]) for i in range(n_files) if n_div_d_sep_array[d + 1, i] - n_div_d_sep_array[d, i] > 0]
+                self.load_filelist_and_ranges += _load_filelist_and_ranges
 
         _logger.debug(
             'Init iter [%d], will load %d (out of %d*%s=%d) files with load_range=%s:\n%s', 0
@@ -208,7 +208,12 @@ class _SimpleIter(object):
             str(self.load_range),
             '\n'.join(self.filelist[: 3]) + '\n ... ' + self.filelist[-1],)
 
-        _logger.debug('Load filelist and ranges in each iteration:\n%s' % '\n'.join(['%s with load_ranges=%s' % (str(f), str(r)) for f, r in self.load_filelist_and_ranges]))
+        debug_text = 'Load filelist and ranges in each iteration:\n'
+        for i, (filelist, load_ranges) in enumerate(self.load_filelist_and_ranges):
+            debug_text += 'Iter %d:\n' % i
+            for f, r in zip(filelist, load_ranges):
+                debug_text += '  - %s: %s\n' % (str(f), str(r))
+        _logger.debug(debug_text)
 
         _logger.info('Restarted DataIter %s, load_range=%s, file_list:\n%s' %
                      (self._name, str(self.load_range), json.dumps(self.worker_file_dict, indent=2)))

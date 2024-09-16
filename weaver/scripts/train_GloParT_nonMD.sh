@@ -48,6 +48,10 @@ qcd1800to2400:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_1800to2400_TuneCP5_13
 qcd2400to3200:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8/*.root \
 qcd3200toinf:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8/*.root \
 ttbar:./datasets/20230504_ak8_UL17_v8/infer/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root \
+zhi:./datasets/20230504_ak8_UL17_v8/infer/BulkGravToZZToZhadZhad_narrow_M-2500_TuneCP5_13TeV-madgraph-pythia/*.root \
+zlo:./datasets/20230504_ak8_UL17_v8/infer/BulkGravToZZToZhadZhad_narrow_M-1000_TuneCP5_13TeV-madgraph-pythia/*.root \
+whi:./datasets/20230504_ak8_UL17_v8/infer/BulkGravToWWToWhadWhad_narrow_M-2500_TuneCP5_13TeV-madgraph-pythia/*.root \
+wlo:./datasets/20230504_ak8_UL17_v8/infer/BulkGravToWWToWhadWhad_narrow_M-1000_TuneCP5_13TeV-madgraph-pythia/*.root \
 --samples-per-epoch $((500 * 512 / $NGPUS)) --samples-per-epoch-val $((500 * 512)) \
 --data-config ${config} --num-workers 5 \
 --network-config networks/example_ParticleTransformer2023Tagger_hybrid.py \

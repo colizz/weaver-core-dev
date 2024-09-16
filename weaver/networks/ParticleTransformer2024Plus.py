@@ -151,7 +151,7 @@ def pairwise_lv_fts_pp_norm(xi, xj, xsum, num_outputs=6, eps=1e-8, for_onnx=Fals
     if num_outputs > 1:
         ptmin = ((pti <= ptj) * pti + (pti > ptj) * ptj) if for_onnx else torch.minimum(pti, ptj)
         lnkt = torch.log((ptmin * delta).clamp(min=eps))
-        lnktrel = lnkt - torch.log(ptall)
+        lnktrel = lnkt - torch.log(ptall.clamp(min=eps))
         lnz = torch.log((ptmin / (pti + ptj).clamp(min=eps)).clamp(min=eps))
         outputs = [lnkt, lnktrel + 7.5, lnz, lndelta]
 
@@ -896,6 +896,7 @@ class ParticleTransformer(nn.Module):
                 return output
 
             x_cls = self._forward_aggregator(x, padding_mask)
+            print(f'{x_cls[:,0]=}')
             if self.fc is None:
                 return x_cls
 

@@ -7,9 +7,9 @@ import tqdm
 import time
 import numpy as np
 from weaver.utils.logger import _logger
-from weaver.utils.nn.tools import (
+from utils.nn.tools import (
     train_classification,
-    evaluate_regression,
+    evaluate_classification,
 )
 
 from weaver.utils.import_tools import import_module
@@ -331,7 +331,7 @@ def get_evaluate_fn(data_config, **kwargs):
     if not for_clip_finetune:
         return evaluate_custom_clip
     else:
-        return evaluate_regression
+        return evaluate_classification
 
 
 def train_custom_clip(model, loss_func, opt, scheduler, train_loader, dev, epoch, steps_per_epoch=None, grad_scaler=None, tb_helper=None):
