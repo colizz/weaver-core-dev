@@ -363,7 +363,25 @@ observers:
     - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWtauev
     - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWtauhv
     - pfMassDecorrelatedInclParticleTransformerV1JetTags_probTopbWtaumv
-
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHbb
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHbc
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHcc
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHcs
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHee
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHgg
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHmm
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHqq
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHss
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHtauhtaue
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHtauhtauh
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probHtauhtaum
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probQCDb
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probQCDbb
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probQCDc
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probQCDcc
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_probQCDothers
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_resonanceMassCorr
+    - pfMassDecorrelatedInclParticleTransformerV2HidLayerJetTags_visiableMassCorr
 
 weights:
   use_precomputed_weights: false

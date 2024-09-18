@@ -19,7 +19,7 @@ fi
 
 # changed to v3 default command
 ## remember: remove all single-quote characters
-ARG="--run-mode train \
+ARG="--run-mode train --train-mode hybrid \
 -o num_nodes 628 -o num_cls_nodes 313 -o loss_gamma 5 -o loss_split_reg True -o use_swiglu_config True -o use_pair_norm_config True \
 -o fc_params [(2048,0.1)] -o embed_dims [256,1024,256] -o pair_embed_dims [64,64,64] -o num_heads 16 -o num_layers 12 \
 --use-amp --batch-size 512 --start-lr 7e-4 --num-epochs 100 --optimizer ranger \
@@ -52,27 +52,24 @@ t_hzxzxhm:./datasets/20240909_ak8_UL17_PUPPIv18_v10/BulkGravitonToHHTo4Z_MX-Var_
 t_haa:./datasets/20240909_ak8_UL17_PUPPIv18_v10/BulkGravitonToHHTo4A_MX-Var_MH-15to650/*.root \
 t_haa4p:./datasets/20240909_ak8_UL17_PUPPIv18_v10/H3ToHHToWHorZH_HToAA_MX-Var_MH-15to650/*.root \
 --data-test \
-hww:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/GluGluToBulkGravitonToHHTo4W_JHUGen_M-1000_narrow/*.root \
-higgs2p:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/GluGluToBulkGravitonToHHTo4QGluLTau_M-1000_narrow/*.root \
-qcd170to300:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/QCD_Pt_170to300_TuneCP5_13TeV_pythia8/*.root \
-qcd300to470:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/QCD_Pt_300to470_TuneCP5_13TeV_pythia8/*.root \
-qcd470to600:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/QCD_Pt_470to600_TuneCP5_13TeV_pythia8/*.root \
-qcd600to800:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/QCD_Pt_600to800_TuneCP5_13TeV_pythia8/*.root \
-qcd800to1000:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/QCD_Pt_800to1000_TuneCP5_13TeV_pythia8/*.root \
-qcd1000to1400:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/QCD_Pt_1000to1400_TuneCP5_13TeV_pythia8/*.root \
-qcd1400to1800:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/QCD_Pt_1400to1800_TuneCP5_13TeV_pythia8/*.root \
-qcd1800to2400:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/QCD_Pt_1800to2400_TuneCP5_13TeV_pythia8/*.root \
-qcd2400to3200:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8/*.root \
-qcd3200toinf:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8/*.root \
-ttbar:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root \
-higlo_part0:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[0-2].root \
-higlo_part1:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[3-5].root \
-higlo_part2:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[6-9].root \
-highi_part0:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-20_narrow/*[0-2].root \
-highi_part1:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-20_narrow/*[3-5].root \
-highi_part2:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-20_narrow/*[6-9].root \
-hwwlo:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/GluGluToBulkGravitonToHHTo4W_JHUGen_MH-50-125-250-300_RatioMGMH-8_narrow/*.root \
-hwwhi:./datasets/20240909_ak8_UL17_PUPPIv18_v10/infer/GluGluToBulkGravitonToHHTo4W_JHUGen_MH-50-125-250-300_RatioMGMH-20_narrow/*.root \
+run3_2023_higlo_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[0-2].root \
+run3_2023_higlo_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[3-5].root \
+run3_2023_higlo_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[6-9].root \
+run3_2023_highi_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[0-2].root \
+run3_2023_highi_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[3-5].root \
+run3_2023_highi_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[6-9].root \
+run3_2023_qcd_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[0-2].root \
+run3_2023_qcd_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[3-5].root \
+run3_2023_qcd_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[6-9].root \
+run3_2023bpix_higlo_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[0-2].root \
+run3_2023bpix_higlo_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[3-5].root \
+run3_2023bpix_higlo_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[6-9].root \
+run3_2023bpix_highi_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[0-2].root \
+run3_2023bpix_highi_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[3-5].root \
+run3_2023bpix_highi_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[6-9].root \
+run3_2023bpix_qcd_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[0-2].root \
+run3_2023bpix_qcd_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[3-5].root \
+run3_2023bpix_qcd_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[6-9].root \
 --samples-per-epoch $((15000 * 512 / $NGPUS)) --samples-per-epoch-val $((1000 * 512)) \
 --data-config ${config} --num-workers 5 \
 --network-config networks/example_ParticleTransformer2023Tagger_hybrid.py \

@@ -503,7 +503,7 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
                 if 'reg_split' in loss_monitor:
                     total_loss_reg_split += loss_monitor['reg_split'] * num_examples
                     total_loss_reg_unifd += loss_monitor['reg_unifd'] * num_examples
-                elif n_reg_target > 1:
+                elif n_reg_target > 1 and loss_func is not None:
                     for i in range(n_reg_target):
                         total_loss_reg_i[i] += loss_monitor[f'reg_{i}'] * num_examples
 
@@ -577,10 +577,6 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
         metric_results_cls = evaluate_metrics(labels['truth_label'], scores_cls, eval_metrics=eval_metrics_cls)
         _logger.info('Evaluation metric for cls: \n%s', '\n'.join(
             ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results_cls.items()]))
-        for i in range(n_reg_target):
-            metric_results_reg = evaluate_metrics(labels[data_config.label_names[i+1]], scores_reg[:, i], eval_metrics=eval_metrics_reg)
-            _logger.info(f'Evaluation metrics for reg_{i}: \n%s', '\n'.join(
-                ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results_reg.items()]))
 
     if for_training:
         return total_loss / count
@@ -593,6 +589,8 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
 def save_custom(args, data_config, scores, labels, observers):
     import ast
     network_options = {k: ast.literal_eval(v) for k, v in args.network_option}
+    split_reg = network_options.get('loss_split_reg', False)
+    composed_split_reg = network_options.get('loss_composed_split_reg', None)
     label_cls_nodes = network_options.get('label_cls_nodes', None)
     label_stored = network_options.get('label_stored', None)
     assert label_cls_nodes is not None, 'label_cls_nodes must be provided as a network option in the test mode'
@@ -607,17 +605,49 @@ def save_custom(args, data_config, scores, labels, observers):
 
     output = {}
     scores_cls, scores_reg = scores
+    assert scores_cls.shape[1] == len(label_cls_nodes), 'Number of classification nodes does not match'
+
     # write regression nodes
-    for idx in range(1, len(data_config.label_names)):
-        name = data_config.label_names[idx]
-        output[name] = labels[name]
-        if not network_options.get('loss_split_reg', False):
-            output['output_' + name] = scores_reg[:, idx-1]
+    if len(data_config.label_names) > 1:
+        if composed_split_reg is not None:
+            idx_reg = 0
+            # write unified regression nodes
+            for idx in range(1, len(data_config.label_names)):
+                name = data_config.label_names[idx]
+                if composed_split_reg[0][idx-1]: # do unified regression
+                    print('write unified regression nodes:', name)
+                    output[name] = labels[name]
+                    output['output_' + name] = scores_reg[:, idx_reg]
+                    idx_reg += 1
+            # write split regression nodes
+            for idx in range(1, len(data_config.label_names)):
+                name = data_config.label_names[idx]
+                if composed_split_reg[1][idx-1]: # do split regression
+                    print('write split regression nodes:', name)
+                    if name not in output:
+                        output[name] = labels[name]
+                    for idx_cls, label_name in enumerate(label_cls_nodes):
+                        if label_name not in label_stored:
+                            continue
+                        output['output_' + name + '_' + label_name] = scores_reg[:, idx_reg + idx_cls]
+                    idx_reg += len(label_cls_nodes)
+
+        elif split_reg:
+            # write split regression nodes
+            for idx in range(1, len(data_config.label_names)):
+                name = data_config.label_names[idx]
+                output[name] = labels[name]
+                for idx_cls, label_name in enumerate(label_cls_nodes):
+                    if label_name not in label_stored:
+                        continue
+                    output['output_' + name + '_' + label_name] = scores_reg[:, (idx-1) * len(label_cls_nodes) + idx_cls]
         else:
-            for idx_cls, label_name in enumerate(label_cls_nodes):
-                if label_name not in label_stored:
-                    continue
-                output['output_' + name + '_' + label_name] = scores_reg[:, (idx-1) * len(label_cls_nodes) + idx_cls]
+            # write normal (unified) regression nodes
+            for idx in range(1, len(data_config.label_names)):
+                name = data_config.label_names[idx]
+                output[name] = labels[name]
+                output['output_' + name] = scores_reg[:, idx-1]
+
     # write classification nodes
     output['cls_index'] = labels['truth_label'] # classes can be too many, only store the index
     for idx, label_name in enumerate(label_cls_nodes):
