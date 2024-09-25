@@ -471,35 +471,35 @@ def evaluate_hybrid(model, test_loader, dev, epoch, for_training=True, loss_func
                     label_reg = None
                 n_reg_target = len(data_config.label_names) - 1
 
-                # with torch.autograd.detect_anomaly():
-                model_output = model(*inputs)
-                # ## a temporary hack: save the embeded space
-                # model_output, model_embed_output = model(*inputs, return_embed=True)
-                # model_embed_output_array.append(model_embed_output.detach().cpu().numpy())
-                # label_cls_array.append(label_cls.detach().cpu().numpy())
+                with torch.autograd.detect_anomaly():
+                    model_output = model(*inputs)
+                    # ## a temporary hack: save the embeded space
+                    # model_output, model_embed_output = model(*inputs, return_embed=True)
+                    # model_embed_output_array.append(model_embed_output.detach().cpu().numpy())
+                    # label_cls_array.append(label_cls.detach().cpu().numpy())
 
-                logits = model_output[:, :n_cls].float()
-                preds_reg = model_output[:, n_cls:].float()
+                    logits = model_output[:, :n_cls].float()
+                    preds_reg = model_output[:, n_cls:].float()
 
-                if not for_training:
-                    scores_cls.append(torch.softmax(logits, dim=1).detach().cpu().numpy())
-                    scores_reg.append(preds_reg.detach().cpu().numpy())
-                    for k, v in y.items():
-                        labels[k].append(v.cpu().numpy())
-                if not for_training:
-                    for k, v in Z.items():
-                        observers[k].append(v.cpu().numpy())
-                if for_training and eval_kw.get('roc_kw', None):
-                    # for making ROC curves
-                    scores_cls.append(torch.softmax(logits, dim=1).detach().cpu().numpy())
-                    labels['truth_label'].append(y['truth_label'].cpu().numpy())
+                    if not for_training:
+                        scores_cls.append(torch.softmax(logits, dim=1).detach().cpu().numpy())
+                        scores_reg.append(preds_reg.detach().cpu().numpy())
+                        for k, v in y.items():
+                            labels[k].append(v.cpu().numpy())
+                    if not for_training:
+                        for k, v in Z.items():
+                            observers[k].append(v.cpu().numpy())
+                    if for_training and eval_kw.get('roc_kw', None):
+                        # for making ROC curves
+                        scores_cls.append(torch.softmax(logits, dim=1).detach().cpu().numpy())
+                        labels['truth_label'].append(y['truth_label'].cpu().numpy())
 
-                _, preds_cls = logits.max(1)
-                if for_training:
-                    loss, loss_monitor = loss_func(logits, preds_reg, label_cls, label_reg)
-                    loss = loss.item()
-                else:
-                    loss, loss_monitor = 0., {'cls': 0., 'reg': 0.}
+                    _, preds_cls = logits.max(1)
+                    if for_training:
+                        loss, loss_monitor = loss_func(logits, preds_reg, label_cls, label_reg)
+                        loss = loss.item()
+                    else:
+                        loss, loss_monitor = 0., {'cls': 0., 'reg': 0.}
 
                 num_batches += 1
                 count += num_examples
@@ -646,10 +646,7 @@ def save_custom(args, data_config, scores, labels, observers):
 
     if label_stored is None:
         label_stored = [
-            "label_Top_bWcs", "label_Top_bWqq", "label_Top_bWc", "label_Top_bWs", "label_Top_bWq", "label_Top_bWev", "label_Top_bWmv", "label_Top_bWtauev", "label_Top_bWtaumv", "label_Top_bWtauhv", "label_Top_Wcs", "label_Top_Wqq", "label_Top_Wev", "label_Top_Wmv", "label_Top_Wtauev", "label_Top_Wtaumv", "label_Top_Wtauhv",
-            "label_Top_bWpcs", "label_Top_bWp'pqq", "label_Top_bWpc", "label_Top_bWps", "label_Top_bWpq", "label_Top_bWpev", "label_Top_bWpmv", "label_Top_bWptauev", "label_Top_bWptaumv", "label_Top_bWptauhv", "label_Top_Wpcs", "label_Top_Wpqq", "label_Top_Wpev", "label_Top_Wpmv", "label_Top_Wptauev", "label_Top_Wptaumv", "label_Top_Wptauhv",
-            "label_Top_bWmcs", "label_Top_bWm'pqq", "label_Top_bWmc", "label_Top_bWms", "label_Top_bWmq", "label_Top_bWmev", "label_Top_bWmmv", "label_Top_bWmtauev", "label_Top_bWmtaumv", "label_Top_bWmtauhv", "label_Top_Wmcs", "label_Top_Wmqq", "label_Top_Wmev", "label_Top_Wmmv", "label_Top_Wmtauev", "label_Top_Wmtaumv", "label_Top_Wmtauhv",
-            "label_H_bb", "label_H_cc", "label_H_ss", "label_H_qq", "label_H_bc", "label_Hp_bc", "label_Hm_bc", "label_H_bs", "label_H_cs", "label_Hp_cs", "label_Hm_cs", "label_H_gg", "label_H_aa", "label_H_ee", "label_H_mm", "label_H_tauhtaue", "label_H_tauhtaum", "label_H_tauhtauh", "label_H_WW_cscs", "label_H_WW_csqq", "label_H_WW_qqqq", "label_H_WW_csc", "label_H_WW_css", "label_H_WW_csq", "label_H_WW_qqc", "label_H_WW_qqs", "label_H_WW_qqq", "label_H_WW_csev", "label_H_WW_qqev", "label_H_WW_csmv", "label_H_WW_qqmv", "label_H_WW_cstauev", "label_H_WW_qqtauev", "label_H_WW_cstaumv", "label_H_WW_qqtaumv", "label_H_WW_cstauhv", "label_H_WW_qqtauhv", 
+            "label_Top_bWcs", "label_Top_bWqq", "label_Top_bWc", "label_Top_bWs", "label_Top_bWq", "label_Top_bWev", "label_Top_bWmv", "label_Top_bWtauev", "label_Top_bWtaumv", "label_Top_bWtauhv", "label_Top_Wcs", "label_Top_Wqq", "label_Top_Wev", "label_Top_Wmv", "label_Top_Wtauev", "label_Top_Wtaumv", "label_Top_Wtauhv", "label_H_bb", "label_H_cc", "label_H_ss", "label_H_qq", "label_H_bc", "label_H_cs", "label_H_gg", "label_H_ee", "label_H_mm", "label_H_tauhtaue", "label_H_tauhtaum", "label_H_tauhtauh", "label_H_WW_cscs", "label_H_WW_csqq", "label_H_WW_qqqq", "label_H_WW_csc", "label_H_WW_css", "label_H_WW_csq", "label_H_WW_qqc", "label_H_WW_qqs", "label_H_WW_qqq", "label_H_WW_csev", "label_H_WW_qqev", "label_H_WW_csmv", "label_H_WW_qqmv", "label_H_WW_cstauev", "label_H_WW_qqtauev", "label_H_WW_cstaumv", "label_H_WW_qqtaumv", "label_H_WW_cstauhv", "label_H_WW_qqtauhv", 
             "label_H_WxWx_cscs", "label_H_WxWx_csqq", "label_H_WxWx_qqqq", "label_H_WxWx_csc", "label_H_WxWx_css", "label_H_WxWx_csq", "label_H_WxWx_qqc", "label_H_WxWx_qqs", "label_H_WxWx_qqq", "label_H_WxWx_csev", "label_H_WxWx_qqev", "label_H_WxWx_csmv", "label_H_WxWx_qqmv", "label_H_WxWx_cstauev", "label_H_WxWx_qqtauev", "label_H_WxWx_cstaumv", "label_H_WxWx_qqtaumv", "label_H_WxWx_cstauhv", "label_H_WxWx_qqtauhv", 
             "label_H_WxWxStar_cscs", "label_H_WxWxStar_csqq", "label_H_WxWxStar_qqqq", "label_H_WxWxStar_csc", "label_H_WxWxStar_css", "label_H_WxWxStar_csq", "label_H_WxWxStar_qqc", "label_H_WxWxStar_qqs", "label_H_WxWxStar_qqq", "label_H_WxWxStar_csev", "label_H_WxWxStar_qqev", "label_H_WxWxStar_csmv", "label_H_WxWxStar_qqmv", "label_H_WxWxStar_cstauev", "label_H_WxWxStar_qqtauev", "label_H_WxWxStar_cstaumv", "label_H_WxWxStar_qqtaumv", "label_H_WxWxStar_cstauhv", "label_H_WxWxStar_qqtauhv", 
             "label_QCD_bb", "label_QCD_cc", "label_QCD_b", "label_QCD_c", "label_QCD_others"

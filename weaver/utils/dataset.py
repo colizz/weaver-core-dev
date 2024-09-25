@@ -279,7 +279,7 @@ class _SimpleIter(object):
 
         filelist, load_ranges = self.load_filelist_and_ranges[self.ipos]
 
-        _logger.info('Start fetching next batch, len(filelist)=%d, \n%s'%(len(filelist), '\n'.join(['%s with load_range=%s' % (str(f), str(r)) for f, r in zip(filelist, load_ranges)])))
+        # _logger.info('Start fetching next batch, len(filelist)=%d, \n%s'%(len(filelist), '\n'.join(['%s with load_range=%s' % (str(f), str(r)) for f, r in zip(filelist, load_ranges)])))
         if self._async_load:
             if hasattr(self, 'executor'):
                 self.executor.shutdown(wait=False)

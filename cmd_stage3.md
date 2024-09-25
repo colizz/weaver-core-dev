@@ -584,6 +584,7 @@ source scripts/train_GloParT_extmass.sh dryrun 0 --network-config networks/examp
 
 jobid=8065357
 jobid=8065360 # for infer
+jobid=7216497 # for infer_UL17
 qcddir=QCD_Pt_170to300_TuneCP5_13TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 0 49`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
 qcddir=QCD_Pt_300to470_TuneCP5_13TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 50 99`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
 qcddir=QCD_Pt_470to600_TuneCP5_13TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 100 149`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
@@ -707,6 +708,12 @@ trainopts="--num-workers 8 --fetch-step 1. --data-split-group 250 " # large memo
 
 source scripts/train_GloParT_extmass.sh run 0,1,2 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 7e-4 $modelopts $trainopts
 
+// new evaluation: make ROC curve
+
+valextopts="-o eval_kw {'roc_kw':{'comp_list':[('Xbb','QCD'),('Xcc','QCD'),('Xcc','Xbb')],'label_inds_map':{'Xbb':[17],'Xcc':[18],'QCD':[308,309,310,311,312]}}} "
+
+source scripts/train_GloParT_extmass.sh run 2 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 7e-4 $modelopts $valopts $valextopts --tensorboard _${PREFIX}.withroc
+
 ### test onnx model (v3 beta 1)
 
 PREFIX=ak8_MD_inclv8std_rmhbs_manual.useamp.large_fc2048.pemb64_block10.gm5.ddp-bs512-lr7e-4.nepoch100 ## best model for now -> labeled beta 1
@@ -821,7 +828,7 @@ PREFIX=ak8_MD_inclv8std_nonmd_manual.freezepart.origmodel.large_fc2048.pemb64_bl
 config=./data_new/inclv7plus_nonmd/${PREFIX%%.*}.yaml
 
 modelopts="-o num_nodes 626 -o num_cls_nodes 313 -o loss_split_reg True -o fc_params [(2048,0.1)] -o use_swiglu_config True -o use_pair_norm_config True -o embed_dims [256,1024,256] -o pair_embed_dims [64,64,64] -o num_heads 16 -o num_layers 10 --num-epochs 100 " # beta 1's config
-modelftopts="-o num_nodes 28 -o num_cls_nodes 28 -o label_cls_nodes ${label_cls_nodes} -o loss_gamma 0 -o use_external_fc True -o freeze_part True -o fc_params [(256,0),(256,0)] --num-epochs 30 --load-model-weights ${load_model} --exclude-model-weights part\\.fc.* --freeze-model-weights (input_embeds|part\\.(embed|pair_embed|blocks|cls_token|cls_blocks|norm)).* " # the fine-tuned model setup; may override some modelopts
+modelftopts="-o num_nodes 28 -o num_cls_nodes 28 -o label_cls_nodes ${label_cls_nodes} -o loss_gamma 0 -o use_external_fc True -o freeze_main_params True -o fc_params [(256,0),(256,0)] --num-epochs 30 --load-model-weights ${load_model} --exclude-model-weights part\\.fc.* --freeze-model-weights (input_embeds|part\\.(embed|pair_embed|blocks|cls_token|cls_blocks|norm)).* " # the fine-tuned model setup; may override some modelopts
 
 trainopts="--run-mode train,val --num-workers 20 --fetch-step 1. --data-split-group 125 --samples-per-epoch-val $((1000 * 512))"
 testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
@@ -879,7 +886,7 @@ modelopts="-o num_nodes 712 -o num_cls_nodes 355 -o loss_composed_split_reg [[Tr
 
 trainopts="--num-workers 3 --fetch-step 1. --data-split-group 320 " # best on farm221
 valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 --log-file logs/${PREFIX}/val.log "
-testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta2 " # fetch-by-file
+testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta2 --model-prefix model/${PREFIX}/net_epoch-97_state.pt " # fetch-by-file #### temp try epoch=97
 
 source scripts/train_GloParT_v3.sh run 4,5,6,7 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $trainopts
 source scripts/train_GloParT_v3.sh run 2 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $valopts
@@ -888,6 +895,9 @@ source scripts/train_GloParT_v3.sh dryrun 3 --network-config networks/example_Pa
 // for test
 source scripts/train_GloParT_v3.sh dryrun 0 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $trainopts --data-train t_ttbar:./datasets/20240909_ak8_UL17_PUPPIv18_v10/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*00.root --data-split-group 2
 
+// eval with ROC
+valextopts="-o eval_kw {'roc_kw':{'comp_list':[('Xbb','QCD'),('Xcc','QCD'),('Xcc','Xbb')],'label_inds_map':{'Xbb':[17],'Xcc':[18],'QCD':[350,351,352,353,354]}}} "
+source scripts/train_GloParT_v3.sh run 2 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $valopts $valextopts --tensorboard _${PREFIX}.withroc
 
 ### updated loss_composed_split_reg logic training (DEPRECATED)
 
@@ -924,3 +934,210 @@ valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 
 testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3pre " # fetch-by-file
 
 source scripts/train_GloParT_v3.sh autorecover 4,5,6,7 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $trainopts
+
+## Testing PUPPIv18 training results
+
+// record the new test file configs
+
+// for run2 UL original
+qcd170to300:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_170to300_TuneCP5_13TeV_pythia8/*.root \
+qcd300to470:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_300to470_TuneCP5_13TeV_pythia8/*.root \
+qcd470to600:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_470to600_TuneCP5_13TeV_pythia8/*.root \
+qcd600to800:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_600to800_TuneCP5_13TeV_pythia8/*.root \
+qcd800to1000:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_800to1000_TuneCP5_13TeV_pythia8/*.root \
+qcd1000to1400:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_1000to1400_TuneCP5_13TeV_pythia8/*.root \
+qcd1400to1800:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_1400to1800_TuneCP5_13TeV_pythia8/*.root \
+qcd1800to2400:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_1800to2400_TuneCP5_13TeV_pythia8/*.root \
+qcd2400to3200:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8/*.root \
+qcd3200toinf:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8/*.root \
+higlo_part0:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[0-2].root \
+higlo_part1:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[3-5].root \
+higlo_part2:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[6-9].root \
+highi_part0:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-20_narrow/*[0-2].root \
+highi_part1:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-20_narrow/*[3-5].root \
+highi_part2:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-20_narrow/*[6-9].root \
+
+
+// for run2 UL re-PUPPI & Run3 2023/2023bpix
+run3_2023_qcd170to300:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_170to300_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd300to470:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_300to470_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd470to600:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_470to600_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd600to800:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_600to800_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd800to1000:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_800to1000_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd1000to1400:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_1000to1400_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd1400to1800:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_1400to1800_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd1800to2400:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_1800to2400_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd2400to3200:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_2400to3200_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd3200toinf:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_3200toInf_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_higlo_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[0-2].root \
+run3_2023_higlo_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[3-5].root \
+run3_2023_higlo_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[6-9].root \
+run3_2023_highi_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[0-2].root \
+run3_2023_highi_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[3-5].root \
+run3_2023_highi_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[6-9].root \
+run3_2023bpix_qcd170to300:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_170to300_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd300to470:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_300to470_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd470to600:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_470to600_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd600to800:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_600to800_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd800to1000:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_800to1000_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd1000to1400:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_1000to1400_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd1400to1800:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_1400to1800_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd1800to2400:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_1800to2400_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd2400to3200:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_2400to3200_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd3200toinf:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_3200toInf_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_higlo_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[0-2].root \
+run3_2023bpix_higlo_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[3-5].root \
+run3_2023bpix_higlo_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[6-9].root \
+run3_2023bpix_highi_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[0-2].root \
+run3_2023bpix_highi_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[3-5].root \
+run3_2023bpix_highi_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[6-9].root \
+run2_repuppi_qcd170to300:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_170to300_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd300to470:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_300to470_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd470to600:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_470to600_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd600to800:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_600to800_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd800to1000:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_800to1000_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd1000to1400:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_1000to1400_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd1400to1800:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_1400to1800_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd1800to2400:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_1800to2400_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd2400to3200:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd3200toinf:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_higlo_part0:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[0-2].root \
+run2_repuppi_higlo_part1:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[3-5].root \
+run2_repuppi_higlo_part2:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[6-9].root \
+run2_repuppi_highi_part0:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[0-2].root \
+run2_repuppi_highi_part1:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[3-5].root \
+run2_repuppi_highi_part2:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_HighPt_narrow/*[6-9].root \
+run2_repuppi_hwwlo:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4W_JHUGen_MH-50-125-250-300_LowPt_narrow/*.root \
+run2_repuppi_hwwhi:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4W_JHUGen_MH-50-125-250-300_HighPt_narrow/*.root \
+run2_repuppi_ttbar:./datasets/20240824_ak8_Run3_v10/infer_UL17/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root \
+
+// old qcd... for recording
+run3_2023_qcd_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[0-2].root \
+run3_2023_qcd_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[3-5].root \
+run3_2023_qcd_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[6-9].root \
+run3_2023bpix_qcd_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[0-2].root \
+run3_2023bpix_qcd_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[3-5].root \
+run3_2023bpix_qcd_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[6-9].root \
+
+// reschedule QCD dirs
+qcddir=QCD_Pt_170to300_TuneCP5_13TeV_pythia8; mkdir ${qcddir}_UL18; for i in `seq 50 99`; do mv ${qcddir}/*-$i.root ${qcddir}_UL18; done
+qcddir=QCD_Pt_300to470_TuneCP5_13TeV_pythia8; mkdir ${qcddir}_UL18; for i in `seq 50 99`; do mv ${qcddir}/*-$i.root ${qcddir}_UL18; done
+qcddir=QCD_Pt_470to600_TuneCP5_13TeV_pythia8; mkdir ${qcddir}_UL18; for i in `seq 50 99`; do mv ${qcddir}/*-$i.root ${qcddir}_UL18; done
+qcddir=QCD_Pt_600to800_TuneCP5_13TeV_pythia8; mkdir ${qcddir}_UL18; for i in `seq 50 99`; do mv ${qcddir}/*-$i.root ${qcddir}_UL18; done
+qcddir=QCD_Pt_800to1000_TuneCP5_13TeV_pythia8; mkdir ${qcddir}_UL18; for i in `seq 50 99`; do mv ${qcddir}/*-$i.root ${qcddir}_UL18; done
+qcddir=QCD_Pt_1000to1400_TuneCP5_13TeV_pythia8; mkdir ${qcddir}_UL18; for i in `seq 50 99`; do mv ${qcddir}/*-$i.root ${qcddir}_UL18; done
+qcddir=QCD_Pt_1400to1800_TuneCP5_13TeV_pythia8; mkdir ${qcddir}_UL18; for i in `seq 50 99`; do mv ${qcddir}/*-$i.root ${qcddir}_UL18; done
+qcddir=QCD_Pt_1800to2400_TuneCP5_13TeV_pythia8; mkdir ${qcddir}_UL18; for i in `seq 50 99`; do mv ${qcddir}/*-$i.root ${qcddir}_UL18; done
+qcddir=QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8; mkdir ${qcddir}_UL18; for i in `seq 50 99`; do mv ${qcddir}/*-$i.root ${qcddir}_UL18; done
+qcddir=QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8; mkdir ${qcddir}_UL18; for i in `seq 25 61`; do mv ${qcddir}/*-$i.root ${qcddir}_UL18; done
+
+// setup pt-binned QCD samples for Run3
+jobid=7187086 # 2023
+jobid=7187092 # 2023bpix
+qcddir=QCD_Pt_170to300_TuneCP5_13p6TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 0 7`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
+qcddir=QCD_Pt_300to470_TuneCP5_13p6TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 8 15`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
+qcddir=QCD_Pt_470to600_TuneCP5_13p6TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 16 23`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
+qcddir=QCD_Pt_600to800_TuneCP5_13p6TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 24 31`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
+qcddir=QCD_Pt_800to1000_TuneCP5_13p6TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 32 39`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
+qcddir=QCD_Pt_1000to1400_TuneCP5_13p6TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 40 47`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
+qcddir=QCD_Pt_1400to1800_TuneCP5_13p6TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 48 55`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
+qcddir=QCD_Pt_1800to2400_TuneCP5_13p6TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 56 63`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
+qcddir=QCD_Pt_2400to3200_TuneCP5_13p6TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 64 71`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
+qcddir=QCD_Pt_3200toInf_TuneCP5_13p6TeV_pythia8; mkdir $qcddir; cd $qcddir; for i in `seq 72 76`; do file="../QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/dnnTuples_${jobid}-$i.root"; [[ -f $file ]] && ln -s $file .; done; cd -;
+
+## 24.09.20 beta 3 training
+
+// get sample weights
+
+PREFIX=ak8_MD_inclv10beta3_test.ddp-bs512-lr7e-4.nepoch100
+PREFIX=ak8_MD_inclv10beta3.ddp-bs512-lr7e-4.nepoch100
+config=./data_new/inclv10/${PREFIX%%.*}.yaml
+
+modelopts="--num-epochs 100 "
+
+trainopts="--num-workers 8 --fetch-step 1. --data-split-group 250 " # large memory setup
+valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3pre " # fetch-by-file
+
+source scripts/train_GloParT_v3.sh run cpu --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 256 --start-lr 7e-4 $modelopts $trainopts --log-file logs/${PREFIX}/pre_train.log
+
+
+### beta 3 training
+
+label_cls_nodes_v3beta3="['label_H_bb','label_H_cc','label_H_ss','label_H_qq','label_Hp_bc','label_Hm_bc','label_H_bs','label_Hp_cs','label_Hm_cs','label_H_gg','label_H_aa','label_H_ee','label_H_mm','label_H_tauhtaue','label_H_tauhtaum','label_H_tauhtauh','label_Top_bWpcs','label_Top_bWpqq','label_Top_bWpc','label_Top_bWps','label_Top_bWpq','label_Top_bWpev','label_Top_bWpmv','label_Top_bWptauev','label_Top_bWptaumv','label_Top_bWptauhv','label_Top_Wpcs','label_Top_Wpqq','label_Top_Wpev','label_Top_Wpmv','label_Top_Wptauev','label_Top_Wptaumv','label_Top_Wptauhv','label_Top_bWmcs','label_Top_bWmqq','label_Top_bWmc','label_Top_bWms','label_Top_bWmq','label_Top_bWmev','label_Top_bWmmv','label_Top_bWmtauev','label_Top_bWmtaumv','label_Top_bWmtauhv','label_Top_Wmcs','label_Top_Wmqq','label_Top_Wmev','label_Top_Wmmv','label_Top_Wmtauev','label_Top_Wmtaumv','label_Top_Wmtauhv','label_H_WW_cscs','label_H_WW_csqq','label_H_WW_qqqq','label_H_WW_csc','label_H_WW_css','label_H_WW_csq','label_H_WW_qqc','label_H_WW_qqs','label_H_WW_qqq','label_H_WW_csev','label_H_WW_qqev','label_H_WW_csmv','label_H_WW_qqmv','label_H_WW_cstauev','label_H_WW_qqtauev','label_H_WW_cstaumv','label_H_WW_qqtaumv','label_H_WW_cstauhv','label_H_WW_qqtauhv','label_H_WxWx_cscs','label_H_WxWx_csqq','label_H_WxWx_qqqq','label_H_WxWx_csc','label_H_WxWx_css','label_H_WxWx_csq','label_H_WxWx_qqc','label_H_WxWx_qqs','label_H_WxWx_qqq','label_H_WxWx_csev','label_H_WxWx_qqev','label_H_WxWx_csmv','label_H_WxWx_qqmv','label_H_WxWx_cstauev','label_H_WxWx_qqtauev','label_H_WxWx_cstaumv','label_H_WxWx_qqtaumv','label_H_WxWx_cstauhv','label_H_WxWx_qqtauhv','label_H_WxWxStar_cscs','label_H_WxWxStar_csqq','label_H_WxWxStar_qqqq','label_H_WxWxStar_csc','label_H_WxWxStar_css','label_H_WxWxStar_csq','label_H_WxWxStar_qqc','label_H_WxWxStar_qqs','label_H_WxWxStar_qqq','label_H_WxWxStar_csev','label_H_WxWxStar_qqev','label_H_WxWxStar_csmv','label_H_WxWxStar_qqmv','label_H_WxWxStar_cstauev','label_H_WxWxStar_qqtauev','label_H_WxWxStar_cstaumv','label_H_WxWxStar_qqtaumv','label_H_WxWxStar_cstauhv','label_H_WxWxStar_qqtauhv','label_H_ZZ_bbbb','label_H_ZZ_bbcc','label_H_ZZ_bbss','label_H_ZZ_bbqq','label_H_ZZ_cccc','label_H_ZZ_ccss','label_H_ZZ_ccqq','label_H_ZZ_ssss','label_H_ZZ_ssqq','label_H_ZZ_qqqq','label_H_ZZ_bbb','label_H_ZZ_bbc','label_H_ZZ_bbs','label_H_ZZ_bbq','label_H_ZZ_ccb','label_H_ZZ_ccc','label_H_ZZ_ccs','label_H_ZZ_ccq','label_H_ZZ_ssb','label_H_ZZ_ssc','label_H_ZZ_sss','label_H_ZZ_ssq','label_H_ZZ_qqb','label_H_ZZ_qqc','label_H_ZZ_qqs','label_H_ZZ_qqq','label_H_ZZ_bbee','label_H_ZZ_bbmm','label_H_ZZ_bbe','label_H_ZZ_bbm','label_H_ZZ_bee','label_H_ZZ_bmm','label_H_ZZ_bbtauhtaue','label_H_ZZ_bbtauhtaum','label_H_ZZ_bbtauhtauh','label_H_ZZ_btauhtaue','label_H_ZZ_btauhtaum','label_H_ZZ_btauhtauh','label_H_ZZ_ccee','label_H_ZZ_ccmm','label_H_ZZ_cce','label_H_ZZ_ccm','label_H_ZZ_cee','label_H_ZZ_cmm','label_H_ZZ_cctauhtaue','label_H_ZZ_cctauhtaum','label_H_ZZ_cctauhtauh','label_H_ZZ_ctauhtaue','label_H_ZZ_ctauhtaum','label_H_ZZ_ctauhtauh','label_H_ZZ_ssee','label_H_ZZ_ssmm','label_H_ZZ_sse','label_H_ZZ_ssm','label_H_ZZ_see','label_H_ZZ_smm','label_H_ZZ_sstauhtaue','label_H_ZZ_sstauhtaum','label_H_ZZ_sstauhtauh','label_H_ZZ_stauhtaue','label_H_ZZ_stauhtaum','label_H_ZZ_stauhtauh','label_H_ZZ_qqee','label_H_ZZ_qqmm','label_H_ZZ_qqe','label_H_ZZ_qqm','label_H_ZZ_qee','label_H_ZZ_qmm','label_H_ZZ_qqtauhtaue','label_H_ZZ_qqtauhtaum','label_H_ZZ_qqtauhtauh','label_H_ZZ_qtauhtaue','label_H_ZZ_qtauhtaum','label_H_ZZ_qtauhtauh','label_H_ZxZx_bbbb','label_H_ZxZx_bbcc','label_H_ZxZx_bbss','label_H_ZxZx_bbqq','label_H_ZxZx_cccc','label_H_ZxZx_ccss','label_H_ZxZx_ccqq','label_H_ZxZx_ssss','label_H_ZxZx_ssqq','label_H_ZxZx_qqqq','label_H_ZxZx_bbb','label_H_ZxZx_bbc','label_H_ZxZx_bbs','label_H_ZxZx_bbq','label_H_ZxZx_ccb','label_H_ZxZx_ccc','label_H_ZxZx_ccs','label_H_ZxZx_ccq','label_H_ZxZx_ssb','label_H_ZxZx_ssc','label_H_ZxZx_sss','label_H_ZxZx_ssq','label_H_ZxZx_qqb','label_H_ZxZx_qqc','label_H_ZxZx_qqs','label_H_ZxZx_qqq','label_H_ZxZx_bbee','label_H_ZxZx_bbmm','label_H_ZxZx_bbe','label_H_ZxZx_bbm','label_H_ZxZx_bee','label_H_ZxZx_bmm','label_H_ZxZx_bbtauhtaue','label_H_ZxZx_bbtauhtaum','label_H_ZxZx_bbtauhtauh','label_H_ZxZx_btauhtaue','label_H_ZxZx_btauhtaum','label_H_ZxZx_btauhtauh','label_H_ZxZx_ccee','label_H_ZxZx_ccmm','label_H_ZxZx_cce','label_H_ZxZx_ccm','label_H_ZxZx_cee','label_H_ZxZx_cmm','label_H_ZxZx_cctauhtaue','label_H_ZxZx_cctauhtaum','label_H_ZxZx_cctauhtauh','label_H_ZxZx_ctauhtaue','label_H_ZxZx_ctauhtaum','label_H_ZxZx_ctauhtauh','label_H_ZxZx_ssee','label_H_ZxZx_ssmm','label_H_ZxZx_sse','label_H_ZxZx_ssm','label_H_ZxZx_see','label_H_ZxZx_smm','label_H_ZxZx_sstauhtaue','label_H_ZxZx_sstauhtaum','label_H_ZxZx_sstauhtauh','label_H_ZxZx_stauhtaue','label_H_ZxZx_stauhtaum','label_H_ZxZx_stauhtauh','label_H_ZxZx_qqee','label_H_ZxZx_qqmm','label_H_ZxZx_qqe','label_H_ZxZx_qqm','label_H_ZxZx_qee','label_H_ZxZx_qmm','label_H_ZxZx_qqtauhtaue','label_H_ZxZx_qqtauhtaum','label_H_ZxZx_qqtauhtauh','label_H_ZxZx_qtauhtaue','label_H_ZxZx_qtauhtaum','label_H_ZxZx_qtauhtauh','label_H_ZxZxStar_bbbb','label_H_ZxZxStar_bbcc','label_H_ZxZxStar_bbss','label_H_ZxZxStar_bbqq','label_H_ZxZxStar_cccc','label_H_ZxZxStar_ccss','label_H_ZxZxStar_ccqq','label_H_ZxZxStar_ssss','label_H_ZxZxStar_ssqq','label_H_ZxZxStar_qqqq','label_H_ZxZxStar_bbb','label_H_ZxZxStar_bbc','label_H_ZxZxStar_bbs','label_H_ZxZxStar_bbq','label_H_ZxZxStar_ccb','label_H_ZxZxStar_ccc','label_H_ZxZxStar_ccs','label_H_ZxZxStar_ccq','label_H_ZxZxStar_ssb','label_H_ZxZxStar_ssc','label_H_ZxZxStar_sss','label_H_ZxZxStar_ssq','label_H_ZxZxStar_qqb','label_H_ZxZxStar_qqc','label_H_ZxZxStar_qqs','label_H_ZxZxStar_qqq','label_H_ZxZxStar_bbee','label_H_ZxZxStar_bbmm','label_H_ZxZxStar_bbe','label_H_ZxZxStar_bbm','label_H_ZxZxStar_bee','label_H_ZxZxStar_bmm','label_H_ZxZxStar_bbtauhtaue','label_H_ZxZxStar_bbtauhtaum','label_H_ZxZxStar_bbtauhtauh','label_H_ZxZxStar_btauhtaue','label_H_ZxZxStar_btauhtaum','label_H_ZxZxStar_btauhtauh','label_H_ZxZxStar_ccee','label_H_ZxZxStar_ccmm','label_H_ZxZxStar_cce','label_H_ZxZxStar_ccm','label_H_ZxZxStar_cee','label_H_ZxZxStar_cmm','label_H_ZxZxStar_cctauhtaue','label_H_ZxZxStar_cctauhtaum','label_H_ZxZxStar_cctauhtauh','label_H_ZxZxStar_ctauhtaue','label_H_ZxZxStar_ctauhtaum','label_H_ZxZxStar_ctauhtauh','label_H_ZxZxStar_ssee','label_H_ZxZxStar_ssmm','label_H_ZxZxStar_sse','label_H_ZxZxStar_ssm','label_H_ZxZxStar_see','label_H_ZxZxStar_smm','label_H_ZxZxStar_sstauhtaue','label_H_ZxZxStar_sstauhtaum','label_H_ZxZxStar_sstauhtauh','label_H_ZxZxStar_stauhtaue','label_H_ZxZxStar_stauhtaum','label_H_ZxZxStar_stauhtauh','label_H_ZxZxStar_qqee','label_H_ZxZxStar_qqmm','label_H_ZxZxStar_qqe','label_H_ZxZxStar_qqm','label_H_ZxZxStar_qee','label_H_ZxZxStar_qmm','label_H_ZxZxStar_qqtauhtaue','label_H_ZxZxStar_qqtauhtaum','label_H_ZxZxStar_qqtauhtauh','label_H_ZxZxStar_qtauhtaue','label_H_ZxZxStar_qtauhtaum','label_H_ZxZxStar_qtauhtauh','label_H_HV_aabb','label_H_HV_aacc','label_H_HV_aass','label_H_HV_aaqq','label_H_HV_aabc','label_H_HV_aacs','label_H_HV_aabq','label_H_HV_aacq','label_H_HV_aasq','label_H_HV_aagg','label_H_HV_aaee','label_H_HV_aamm','label_H_HV_aatauhtaue','label_H_HV_aatauhtaum','label_H_HV_aatauhtauh','label_H_HV_aab','label_H_HV_aac','label_H_HV_aas','label_H_HV_aaq','label_H_HV_aag','label_H_HV_aae','label_H_HV_aam','label_H_HV_aataue','label_H_HV_aataum','label_H_HV_aatauh','label_H_HV_abb','label_H_HV_acc','label_H_HV_ass','label_H_HV_aqq','label_H_HV_abc','label_H_HV_acs','label_H_HV_abq','label_H_HV_acq','label_H_HV_asq','label_H_HV_agg','label_H_HV_aee','label_H_HV_amm','label_H_HV_atauhtaue','label_H_HV_atauhtaum','label_H_HV_atauhtauh','label_QCD_bb','label_QCD_cc','label_QCD_b','label_QCD_c','label_QCD_others']"
+
+PREFIX=ak8_MD_inclv10beta3_manual.ddp4-bs512-lr1e-3.nepoch100.farm221 # 4GPU
+config=./data_new/inclv10/${PREFIX%%.*}.yaml
+
+modelopts="-o num_nodes 750 -o num_cls_nodes 374 -o loss_composed_split_reg [[True,True],[True,False]] --num-epochs 100 "
+
+trainopts="--num-workers 3 --fetch-step 1. --data-split-group 320 " # best on farm221
+valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 --log-file logs/${PREFIX}/val.log "
+valextopts="-o eval_kw {'roc_kw':{'comp_list':[('Xbb','QCD'),('Xcc','QCD'),('Xcc','Xbb')],'label_inds_map':{'Xbb':[0],'Xcc':[1],'QCD':[369,370,371,372,373]}}} "
+testopts="--run-mode test --num-workers 2 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta3 --model-prefix model/${PREFIX}/net_epoch-97_state.pt " # fetch-by-file ##!! use model 97
+
+source scripts/train_GloParT_v3.sh run 0,1,2,3 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $trainopts
+source scripts/train_GloParT_v3.sh run 2 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $valopts $valextopts
+source scripts/train_GloParT_v3.sh dryrun 0 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $testopts
+
+// for test
+source scripts/train_GloParT_v3.sh dryrun 0 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $trainopts --data-train t_ttbar:./datasets/20240909_ak8_UL17_PUPPIv18_v10/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*00.root --data-split-group 2
+
+source scripts/train_GloParT_v3.sh run 3 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $valopts --load-epoch 59 --samples-per-epoch-val 100000000 --log-file logs/${PREFIX}/val.checknan.log --tensorboard _${PREFIX}.checknan
+
+// test step with epoch=67
+specialtestopts="--run-mode test --num-workers 2 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta3 --model-prefix model/${PREFIX}/net_epoch-67_state.pt --predict-output predict/$PREFIX.epoch67/pred.root" # fetch-by-file ##!! use model 67
+source scripts/train_GloParT_v3.sh dryrun 1 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $specialtestopts
+
+
+### beta 3 training (original QCD) -> card + bash script changes
+// card: QCD weight back to 1..
+
+// get sample weights
+
+PREFIX=ak8_MD_inclv10beta3_test.ddp-bs512-lr7e-4.nepoch100
+PREFIX=ak8_MD_inclv10beta3.ddp-bs512-lr7e-4.nepoch100
+PREFIX=ak8_MD_inclv10beta3_origQCD.ddp-bs512-lr7e-4.nepoch100
+config=./data_new/inclv10/${PREFIX%%.*}.yaml
+
+modelopts="--num-epochs 100 "
+
+trainopts="--num-workers 8 --fetch-step 1. --data-split-group 250 " # large memory setup
+valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3pre " # fetch-by-file
+
+source scripts/train_GloParT_v3_origQCD.sh run cpu --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 256 --start-lr 7e-4 $modelopts $trainopts --log-file logs/${PREFIX}/pre_train.log --print
+
+// training
+
+PREFIX=ak8_MD_inclv10beta3_origQCD_manual.ddp4-bs512-lr1e-3.nepoch100.ihep # 4GPU
+config=./data_new/inclv10/${PREFIX%%.*}.yaml
+
+modelopts="-o num_nodes 750 -o num_cls_nodes 374 -o loss_composed_split_reg [[True,True],[True,False]] --num-epochs 100 "
+
+trainopts="--num-workers 4 --fetch-step 1. --data-split-group 320 " # on ihep
+valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 --log-file logs/${PREFIX}/val.log "
+valextopts="-o eval_kw {'roc_kw':{'comp_list':[('Xbb','QCD'),('Xcc','QCD'),('Xcc','Xbb')],'label_inds_map':{'Xbb':[0],'Xcc':[1],'QCD':[369,370,371,372,373]}}} "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta3 " # fetch-by-file
+
+source scripts/train_GloParT_v3_origQCD.sh run 0,1,2,3 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $trainopts
+source scripts/train_GloParT_v3_origQCD.sh run 3 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $valopts $valextopts
+source scripts/train_GloParT_v3_origQCD.sh dryrun 3 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $testopts
+
+// test step with epoch=67
+specialtestopts="--run-mode test --num-workers 2 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta3 --model-prefix model/${PREFIX}/net_epoch-67_state.pt --predict-output predict/$PREFIX.epoch67/pred.root" # fetch-by-file ##!! use model 67
+source scripts/train_GloParT_v3_origQCD.sh dryrun 1 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $specialtestopts
+
+// continue training from epoch=69 towards 120
+
+PREFIX=ak8_MD_inclv10beta3_origQCD_manual.ddp4-bs512-lr1e-3.nepoch120.ihep # 4GPU -> change to 120
+config=./data_new/inclv10/${PREFIX%%.*}.yaml
+
+modelopts="-o num_nodes 750 -o num_cls_nodes 374 -o loss_composed_split_reg [[True,True],[True,False]] --num-epochs 120 "
+
+trainopts="--num-workers 3 --fetch-step 1. --data-split-group 320 " # on farm221
+valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 --log-file logs/${PREFIX}/val.log "
+valextopts="-o eval_kw {'roc_kw':{'comp_list':[('Xbb','QCD'),('Xcc','QCD'),('Xcc','Xbb')],'label_inds_map':{'Xbb':[0],'Xcc':[1],'QCD':[369,370,371,372,373]}}} "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta3 " # fetch-by-file
+
+source scripts/train_GloParT_v3_origQCD.sh run 0,1,2,3 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $trainopts --load-epoch 69
