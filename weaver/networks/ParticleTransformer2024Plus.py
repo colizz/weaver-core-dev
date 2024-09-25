@@ -896,7 +896,6 @@ class ParticleTransformer(nn.Module):
                 return output
 
             x_cls = self._forward_aggregator(x, padding_mask)
-            print(f'{x_cls[:,0]=}')
             if self.fc is None:
                 return x_cls
 

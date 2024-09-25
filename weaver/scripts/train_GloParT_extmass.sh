@@ -77,13 +77,19 @@ hwwhi:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4W_JHUGen_
 
 if [ $RUN == "dryrun" ]; then
     echo "Dryrun mode"
-elif [ $RUN == "run" ]; then
+elif [ $RUN == "run" ] || [ $RUN == "autorecover" ]; then
     ARG="$ARG --log-file logs/${PREFIX}/train.log --tensorboard _${PREFIX} "
 else
     exit 1
 fi
 
+if [ $GPUS == "cpu" ]; then
+    cmd="python train.py $ARG $cmdlineopts "
+elif [ $GPUS -eq $GPUS 2>/dev/null ]; then
 # if GPUS is an integer
+# if GPUS is an integer
+if [ $GPUS -eq $GPUS 2>/dev/null ]; then
+    # if GPUS is an integer
 if [ $GPUS -eq $GPUS 2>/dev/null ]; then
     cmd="python train.py --gpus $GPUS $ARG $cmdlineopts "
 else
@@ -94,22 +100,30 @@ fi
 
 echo Run command: $cmd
 
+if [ $RUN == "dryrun" ] || [ $RUN == "run" ]; then
+    $cmd
+elif [ $RUN == "autorecover" ]; then
+    epochopts=""
+# if the training is halted, resume from the last epoch
 # if the training is halted, resume from the last epoch
 epochopts=""
-while true; do
-    $cmd $epochopts
-    ret=$?
-    if [ $ret -eq 0 ]; then
-        break
-    fi
-    echo "Error: return code $ret"
-    # match model/${PREFIX}/net/net_epoch-(\d+)_state.pt and extract the maximum epoch number
-    maxepoch=$(ls model/${PREFIX}/net_epoch-*.pt | sed -n s/.*net_epoch-\([0-9]*\)_state.pt/\1/p | sort -n | tail -n 1)
-    if [ -z $maxepoch ]; then
-        epochopts=""
-    else
-        epochopts="--load-epoch $maxepoch"
-        echo "Resuming from epoch $maxepoch"
-    fi
-    sleep 10
-done
+    # if the training is halted, resume from the last epoch
+epochopts=""
+    while true; do
+        $cmd $epochopts
+        ret=$?
+        if [ $ret -eq 0 ]; then
+            break
+        fi
+        echo "Error: return code $ret"
+        # match model/${PREFIX}/net/net_epoch-(\d+)_state.pt and extract the maximum epoch number
+        maxepoch=$(ls model/${PREFIX}/net_epoch-*.pt | sed -n s/.*net_epoch-\([0-9]*\)_state.pt/\1/p | sort -n | tail -n 1)
+        if [ -z $maxepoch ]; then
+            epochopts=""
+        else
+            epochopts="--load-epoch $maxepoch"
+            echo "Resuming from epoch $maxepoch"
+        fi
+        sleep 10
+    done
+fi

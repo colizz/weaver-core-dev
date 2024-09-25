@@ -25,16 +25,16 @@ ARG="--run-mode train --train-mode hybrid \
 --use-amp --batch-size 512 --start-lr 7e-4 --num-epochs 100 --optimizer ranger \
 --num-workers 8 --fetch-step 1. --data-split-num 250 \
 --data-train \
-t_qcd170to300:./datasets/20240909_ak8_UL17_PUPPIv18_v10/QCD_Pt_170to300_TuneCP5_13TeV_pythia8*/*.root \
-t_qcd300to470:./datasets/20240909_ak8_UL17_PUPPIv18_v10/QCD_Pt_300to470_TuneCP5_13TeV_pythia8*/*.root \
-t_qcd470to600:./datasets/20240909_ak8_UL17_PUPPIv18_v10/QCD_Pt_470to600_TuneCP5_13TeV_pythia8*/*.root \
-t_qcd600to800:./datasets/20240909_ak8_UL17_PUPPIv18_v10/QCD_Pt_600to800_TuneCP5_13TeV_pythia8*/*.root \
-t_qcd800to1000:./datasets/20240909_ak8_UL17_PUPPIv18_v10/QCD_Pt_800to1000_TuneCP5_13TeV_pythia8*/*.root \
-t_qcd1000to1400:./datasets/20240909_ak8_UL17_PUPPIv18_v10/QCD_Pt_1000to1400_TuneCP5_13TeV_pythia8*/*.root \
-t_qcd1400to1800:./datasets/20240909_ak8_UL17_PUPPIv18_v10/QCD_Pt_1400to1800_TuneCP5_13TeV_pythia8*/*.root \
-t_qcd1800to2400:./datasets/20240909_ak8_UL17_PUPPIv18_v10/QCD_Pt_1800to2400_TuneCP5_13TeV_pythia8*/*.root \
-t_qcd2400to3200:./datasets/20240909_ak8_UL17_PUPPIv18_v10/QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8*/*.root \
-t_qcd3200toinf:./datasets/20240909_ak8_UL17_PUPPIv18_v10/QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8*/*.root \
+t_qcd170to300:./datasets/20230504_ak8_UL17_v8/QCD_Pt_170to300_TuneCP5_13TeV_pythia8*/*.root \
+t_qcd300to470:./datasets/20230504_ak8_UL17_v8/QCD_Pt_300to470_TuneCP5_13TeV_pythia8*/*.root \
+t_qcd470to600:./datasets/20230504_ak8_UL17_v8/QCD_Pt_470to600_TuneCP5_13TeV_pythia8*/*.root \
+t_qcd600to800:./datasets/20230504_ak8_UL17_v8/QCD_Pt_600to800_TuneCP5_13TeV_pythia8*/*.root \
+t_qcd800to1000:./datasets/20230504_ak8_UL17_v8/QCD_Pt_800to1000_TuneCP5_13TeV_pythia8*/*.root \
+t_qcd1000to1400:./datasets/20230504_ak8_UL17_v8/QCD_Pt_1000to1400_TuneCP5_13TeV_pythia8*/*.root \
+t_qcd1400to1800:./datasets/20230504_ak8_UL17_v8/QCD_Pt_1400to1800_TuneCP5_13TeV_pythia8*/*.root \
+t_qcd1800to2400:./datasets/20230504_ak8_UL17_v8/QCD_Pt_1800to2400_TuneCP5_13TeV_pythia8*/*.root \
+t_qcd2400to3200:./datasets/20230504_ak8_UL17_v8/QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8*/*.root \
+t_qcd3200toinf:./datasets/20230504_ak8_UL17_v8/QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8*/*.root \
 t_ttbar:./datasets/20240909_ak8_UL17_PUPPIv18_v10/Spin0ToTT_VariableMass_WhadOrlep_MX-600to6000_MH-15to250/*.root \
 t_h2p:./datasets/20240909_ak8_UL17_PUPPIv18_v10/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*.root \
 t_hpm2p:./datasets/20240909_ak8_UL17_PUPPIv18_v10/DiH1OrHpm_2HDM_HpmToBC_HpmToCS_H1ToBS_HT-600to6000_MH-15to250/*.root \
