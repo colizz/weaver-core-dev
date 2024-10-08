@@ -212,7 +212,7 @@ class _SimpleIter(object):
         for i, (filelist, load_ranges) in enumerate(self.load_filelist_and_ranges):
             debug_text += 'Iter %d:\n' % i
             for f, r in zip(filelist, load_ranges):
-                debug_text += '  - %s: %s\n' % (str(f), str(r))
+                debug_text += '  - %s with load_range=%s\n' % (str(f), str((round(r[0], 6), round(r[1], 6))))
         _logger.debug(debug_text)
 
         _logger.info('Restarted DataIter %s, load_range=%s, file_list:\n%s' %

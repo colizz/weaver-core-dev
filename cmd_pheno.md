@@ -2306,3 +2306,20 @@ python $HOME/hww/incl-train/dev/weaver-core-hqu/weaver/train.py --predict \
 --data-config ${config} --num-workers 1 \
 --network-config networks/example_ParticleTransformer_sophon.py \
 --model-prefix $HOME/hww/incl-train/weaver-core/weaver/model/JetClassII_ak8puppi_full_scale/net_best_epoch_state.pt
+
+# 24.10.07 reorganizing Sophon training cmd
+
+## reproduce Sophon
+
+DATADIR=/home/olympus/licq/datasets/JetClassII
+
+PREFIX=JetClassII_full_manual.std.ddp4-bs512-lr2e-3
+config=./data_pheno/JetClassII_v2/${PREFIX%%.*}.yaml
+
+modelopts=" "
+
+trainopts="--run-mode train --num-workers 3 --fetch-step 1. --data-split-num 200 "
+valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-num 200 --log-file logs/${PREFIX}/val.log "
+
+source scripts/train_Sophon_v1.sh run 0 --batch-size 512 --start-lr 2e-3 $modelopts $trainopts
+source scripts/train_Sophon_v1.sh run 3 --batch-size 640 --start-lr 1.2e-3 $modelopts $valopts

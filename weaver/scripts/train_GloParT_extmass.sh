@@ -86,11 +86,7 @@ fi
 if [ $GPUS == "cpu" ]; then
     cmd="python train.py $ARG $cmdlineopts "
 elif [ $GPUS -eq $GPUS 2>/dev/null ]; then
-# if GPUS is an integer
-# if GPUS is an integer
-if [ $GPUS -eq $GPUS 2>/dev/null ]; then
     # if GPUS is an integer
-if [ $GPUS -eq $GPUS 2>/dev/null ]; then
     cmd="python train.py --gpus $GPUS $ARG $cmdlineopts "
 else
     # GPU list is separated by comma
@@ -104,11 +100,7 @@ if [ $RUN == "dryrun" ] || [ $RUN == "run" ]; then
     $cmd
 elif [ $RUN == "autorecover" ]; then
     epochopts=""
-# if the training is halted, resume from the last epoch
-# if the training is halted, resume from the last epoch
-epochopts=""
     # if the training is halted, resume from the last epoch
-epochopts=""
     while true; do
         $cmd $epochopts
         ret=$?

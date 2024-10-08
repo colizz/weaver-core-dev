@@ -306,17 +306,17 @@ class PairEmbed(nn.Module):
     def __init__(
             self, pairwise_lv_dim, pairwise_input_dim, dims,
             pairwise_lv_type='pp', use_pair_norm=False,
-            remove_self_pair=False, use_pre_activation_pair=True, mode='sum',
+            remove_self_pair=False, use_pre_activation_pair=True,
             normalize_input=True, activation='gelu', eps=1e-8,
-            for_onnx=False):
+            for_onnx=False, sparse_eval=None):
         super().__init__()
 
         self.pairwise_lv_dim = pairwise_lv_dim
         self.pairwise_input_dim = pairwise_input_dim
         self.use_pair_norm = use_pair_norm
         self.remove_self_pair = remove_self_pair
-        self.mode = mode
         self.for_onnx = for_onnx
+        self.sparse_eval = (not for_onnx) if sparse_eval is None else sparse_eval
         self.out_dim = dims[-1]
 
         if pairwise_lv_type == 'pp' and not use_pair_norm:
@@ -331,8 +331,8 @@ class PairEmbed(nn.Module):
         else:
             raise RuntimeError('Invalid value for `pairwise_lv_type`: ' + pairwise_lv_type)
 
-        if self.mode == 'concat':
-            input_dim = pairwise_lv_dim + pairwise_input_dim
+        if pairwise_lv_dim > 0:
+            input_dim = pairwise_lv_dim
             module_list = [nn.BatchNorm1d(input_dim)] if normalize_input else []
             for dim in dims:
                 module_list.extend([
@@ -344,38 +344,22 @@ class PairEmbed(nn.Module):
             if use_pre_activation_pair:
                 module_list = module_list[:-1]
             self.embed = nn.Sequential(*module_list)
-        elif self.mode == 'sum':
-            if pairwise_lv_dim > 0:
-                input_dim = pairwise_lv_dim
-                module_list = [nn.BatchNorm1d(input_dim)] if normalize_input else []
-                for dim in dims:
-                    module_list.extend([
-                        nn.Conv1d(input_dim, dim, 1),
-                        nn.BatchNorm1d(dim),
-                        nn.GELU() if activation == 'gelu' else nn.ReLU(),
-                    ])
-                    input_dim = dim
-                if use_pre_activation_pair:
-                    module_list = module_list[:-1]
-                self.embed = nn.Sequential(*module_list)
 
-            if pairwise_input_dim > 0:
-                input_dim = pairwise_input_dim
-                module_list = [nn.BatchNorm1d(input_dim)] if normalize_input else []
-                for dim in dims:
-                    module_list.extend([
-                        nn.Conv1d(input_dim, dim, 1),
-                        nn.BatchNorm1d(dim),
-                        nn.GELU() if activation == 'gelu' else nn.ReLU(),
-                    ])
-                    input_dim = dim
-                if use_pre_activation_pair:
-                    module_list = module_list[:-1]
-                self.fts_embed = nn.Sequential(*module_list)
-        else:
-            raise RuntimeError('`mode` can only be `sum` or `concat`')
+        if pairwise_input_dim > 0:
+            input_dim = pairwise_input_dim
+            module_list = [nn.BatchNorm1d(input_dim)] if normalize_input else []
+            for dim in dims:
+                module_list.extend([
+                    nn.Conv1d(input_dim, dim, 1),
+                    nn.BatchNorm1d(dim),
+                    nn.GELU() if activation == 'gelu' else nn.ReLU(),
+                ])
+                input_dim = dim
+            if use_pre_activation_pair:
+                module_list = module_list[:-1]
+            self.fts_embed = nn.Sequential(*module_list)
 
-    def forward(self, x, uu=None, mask=None):
+    def _forward_dense(self, x, uu=None, mask=None):
         # x: (batch, v_dim, seq_len)
         # uu: (batch, v_dim, seq_len, seq_len)
         assert (x is not None or uu is not None)
@@ -398,7 +382,7 @@ class PairEmbed(nn.Module):
                     uu = uu[:, :, i, j]
             else:
                 if x is not None:
-                    xsum = (x * mask).sum(dim=-1, keepdims=True) if self.use_pair_norm else None
+                    xsum = (x * mask).sum(dim=-1, keepdims=True).unsqueeze(-1) if self.use_pair_norm else None
                     x = self.pairwise_lv_fts(x.unsqueeze(-1), x.unsqueeze(-2), xsum)
                     if self.remove_self_pair:
                         i = torch.arange(0, seq_len, device=x.device)
@@ -406,23 +390,13 @@ class PairEmbed(nn.Module):
                     x = x.view(-1, self.pairwise_lv_dim, seq_len * seq_len)
                 if uu is not None:
                     uu = uu.view(-1, self.pairwise_input_dim, seq_len * seq_len)
-            if self.mode == 'concat':
-                if x is None:
-                    pair_fts = uu
-                elif uu is None:
-                    pair_fts = x
-                else:
-                    pair_fts = torch.cat((x, uu), dim=1)
 
-        if self.mode == 'concat':
-            elements = self.embed(pair_fts)  # (batch, embed_dim, num_elements)
-        elif self.mode == 'sum':
-            if x is None:
-                elements = self.fts_embed(uu)
-            elif uu is None:
-                elements = self.embed(x)
-            else:
-                elements = self.embed(x) + self.fts_embed(uu)
+        # with grad
+        elements = 0
+        if x is not None:
+            elements = elements + self.embed(x)
+        if uu is not None:
+            elements = elements + self.fts_embed(uu)
 
         if self.is_symmetric and not self.for_onnx:
             y = torch.zeros(batch_size, self.out_dim, seq_len, seq_len, dtype=elements.dtype, device=elements.device)
@@ -431,6 +405,54 @@ class PairEmbed(nn.Module):
         else:
             y = elements.view(-1, self.out_dim, seq_len, seq_len)
         return y
+
+    def _forward_sparse(self, x, uu=None, mask=None):
+        # x: (batch, v_dim, seq_len)
+        # uu: (batch, v_dim, seq_len, seq_len)
+        assert (x is not None or uu is not None)
+        with torch.no_grad():
+            if x is not None:
+                batch_size, _, seq_len = x.size()
+            else:
+                batch_size, _, seq_len, _ = uu.size()
+
+            i0, i1, i2, i3 = (Ellipsis,) * 4
+            mask2d = mask.unsqueeze(-1) * mask.unsqueeze(-2)  # (batch_size, 1, seq_len, seq_len)
+            if self.is_symmetric:
+                offset = -1 if self.remove_self_pair else 0
+                i0, _, i2, i3 = mask2d.float().tril(offset).nonzero(as_tuple=True)
+            else:
+                i0, _, i2, i3 = mask2d.nonzero(as_tuple=True)
+
+            if x is not None:
+                xsum = (x * mask).sum(dim=-1, keepdims=True).unsqueeze(-1) if self.use_pair_norm else None
+                x = self.pairwise_lv_fts(x.unsqueeze(-1), x.unsqueeze(-2), xsum)
+                x = x.permute(0, 2, 3, 1)[i0, i2, i3, :]  # (num_elements, pairwise_lv_dim)
+                x = x.T.unsqueeze(0).contiguous()  # (1, pairwise_lv_dim, num_elements)
+            if uu is not None:
+                uu = uu.permute(0, 2, 3, 1)[i0, i2, i3, :]  # (num_elements, pairwise_input_dim)
+                uu = uu.T.unsqueeze(0).contiguous()  # (1, pairwise_input_dim, num_elements)
+
+        # with grad
+        elements = 0
+        if x is not None:
+            elements = elements + self.embed(x)
+        if uu is not None:
+            elements = elements + self.fts_embed(uu)
+        elements = elements.squeeze(0).T  # (num_elements, out_dim)
+
+        y = torch.zeros(batch_size, seq_len, seq_len, self.out_dim, dtype=elements.dtype, device=elements.device)
+        y[i0, i2, i3, :] = elements
+        if self.is_symmetric:
+            y[i0, i3, i2, :] = elements
+        y = y.permute(0, 3, 1, 2).contiguous()
+        return y
+
+    def forward(self, x, uu=None, mask=None):
+        if self.sparse_eval:
+            return self._forward_sparse(x, uu=uu, mask=mask)
+        else:
+            return self._forward_dense(x, uu=uu, mask=mask)
 
 
 def _canonical_mask(
@@ -738,6 +760,7 @@ class ParticleTransformer(nn.Module):
                  for_segmentation=False,
                  use_amp=False,
                  export_params=None,
+                 return_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -748,6 +771,7 @@ class ParticleTransformer(nn.Module):
         self.for_segmentation = for_segmentation
         self.use_amp = use_amp
         self.export_params = export_params
+        self.return_embed = return_embed
 
         embed_dim = embed_dims[-1] if len(embed_dims) > 0 else input_dim
         default_cfg = dict(embed_dim=embed_dim, num_heads=num_heads, ffn_ratio=4,
@@ -840,7 +864,7 @@ class ParticleTransformer(nn.Module):
             x = self.embed(x).masked_fill(~mask.transpose(1, 2), 0)  # (batch_size, seq_len, num_fts)
             attn_mask = None
             if (v is not None or uu is not None) and self.pair_embed is not None:
-                attn_mask = self.pair_embed(v, uu, mask)  # (batch_size, num_heads, seq_len, seq_len)
+                attn_mask = self.pair_embed(v, uu=uu, mask=mask)  # (batch_size, num_heads, seq_len, seq_len)
 
             # transform
             for block in self.blocks:
@@ -912,7 +936,10 @@ class ParticleTransformer(nn.Module):
                     output = torch.cat([output, x_cls], dim=-1)
 
             # print('output:\n', output)
-            return output
+            if not self.return_embed:
+                return output
+            else:
+                return output, x_cls
 
 
 class ParticleTransformerTagger(nn.Module):
@@ -942,6 +969,7 @@ class ParticleTransformerTagger(nn.Module):
                  for_inference=False,
                  use_amp=False,
                  export_params=None,
+                 return_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -975,7 +1003,8 @@ class ParticleTransformerTagger(nn.Module):
                                         trim=False,
                                         for_inference=for_inference,
                                         use_amp=use_amp,
-                                        export_params=export_params)
+                                        export_params=export_params,
+                                        return_embed=return_embed)
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -1027,6 +1056,7 @@ class ParticleTransformerTagger_ncoll(nn.Module):
                  for_inference=False,
                  use_amp=False,
                  export_params=None,
+                 return_embed=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -1065,7 +1095,8 @@ class ParticleTransformerTagger_ncoll(nn.Module):
                                         trim=False,
                                         for_inference=for_inference,
                                         use_amp=use_amp,
-                                        export_params=export_params)
+                                        export_params=export_params,
+                                        return_embed=return_embed)
 
     @torch.jit.ignore
     def no_weight_decay(self):
