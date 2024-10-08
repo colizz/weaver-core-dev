@@ -231,10 +231,14 @@ def _read_root(filepath, branches, load_range=None, treename=None):
         "filepath.endswith('20ifb.root') or re.search(r'mixed_ntuple/ntuples_\d*[05].root$', filepath)": {'file_no': 2},
     }
     '''
+    '''
     # for training with v10
     specific_vars = {
         "not 'Spin0ToTT' in filepath and not 'DiH1OrHpm' in filepath": {'fj_gen_pid': 0, 'fj_gendau1_pid': 0},
     }
+    specific_vars_included = {}
+    '''
+    specific_vars = {}
     specific_vars_included = {}
 
     def remove_branch(branches, filepath):

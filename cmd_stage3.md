@@ -821,7 +821,7 @@ source scripts/train_GloParT_nonMD.sh run 1 --network-config networks/example_Pa
 source scripts/train_GloParT_nonMD.sh dryrun 1 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $testopts
 
 
-### Fix bug: the ParT is not entirely frozon -> BatchNorm has running stats..
+### Fix bug: the ParT is not entirely frozen -> BatchNorm has running stats..
 // add -o freeze_part True
 
 PREFIX=ak8_MD_inclv8std_nonmd_manual.freezepart.origmodel.large_fc2048.pemb64_block10.gm5.ddp-bs512-lr7e-4.nepoch100
@@ -829,6 +829,20 @@ config=./data_new/inclv7plus_nonmd/${PREFIX%%.*}.yaml
 
 modelopts="-o num_nodes 626 -o num_cls_nodes 313 -o loss_split_reg True -o fc_params [(2048,0.1)] -o use_swiglu_config True -o use_pair_norm_config True -o embed_dims [256,1024,256] -o pair_embed_dims [64,64,64] -o num_heads 16 -o num_layers 10 --num-epochs 100 " # beta 1's config
 modelftopts="-o num_nodes 28 -o num_cls_nodes 28 -o label_cls_nodes ${label_cls_nodes} -o loss_gamma 0 -o use_external_fc True -o freeze_main_params True -o fc_params [(256,0),(256,0)] --num-epochs 30 --load-model-weights ${load_model} --exclude-model-weights part\\.fc.* --freeze-model-weights (input_embeds|part\\.(embed|pair_embed|blocks|cls_token|cls_blocks|norm)).* " # the fine-tuned model setup; may override some modelopts
+
+trainopts="--run-mode train,val --num-workers 20 --fetch-step 1. --data-split-group 125 --samples-per-epoch-val $((1000 * 512))"
+testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
+
+source scripts/train_GloParT_nonMD.sh run 1 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 4e-3 $modelopts $modelftopts $trainopts
+source scripts/train_GloParT_nonMD.sh dryrun 1 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $testopts
+
+// try larger MLP?
+
+PREFIX=ak8_MD_inclv8std_nonmd_manual.freezepart_fc2048.origmodel.large_fc2048.pemb64_block10.gm5.ddp-bs512-lr7e-4.nepoch100
+config=./data_new/inclv7plus_nonmd/${PREFIX%%.*}.yaml
+
+modelopts="-o num_nodes 626 -o num_cls_nodes 313 -o loss_split_reg True -o fc_params [(2048,0.1)] -o use_swiglu_config True -o use_pair_norm_config True -o embed_dims [256,1024,256] -o pair_embed_dims [64,64,64] -o num_heads 16 -o num_layers 10 --num-epochs 100 " # beta 1's config
+modelftopts="-o num_nodes 28 -o num_cls_nodes 28 -o label_cls_nodes ${label_cls_nodes} -o loss_gamma 0 -o use_external_fc True -o freeze_main_params True -o fc_params [(2048,0)] --num-epochs 30 --load-model-weights ${load_model} --exclude-model-weights part\\.fc.* --freeze-model-weights (input_embeds|part\\.(embed|pair_embed|blocks|cls_token|cls_blocks|norm)).* " # the fine-tuned model setup; may override some modelopts
 
 trainopts="--run-mode train,val --num-workers 20 --fetch-step 1. --data-split-group 125 --samples-per-epoch-val $((1000 * 512))"
 testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
@@ -1011,6 +1025,10 @@ run2_repuppi_hwwlo:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravi
 run2_repuppi_hwwhi:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4W_JHUGen_MH-50-125-250-300_HighPt_narrow/*.root \
 run2_repuppi_ttbar:./datasets/20240824_ak8_Run3_v10/infer_UL17/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root \
 
+// [note] from beta4, changing two repuppi samples
+run2_repuppi_qcd470to600:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_470to600_TuneCP5_13TeV_pythia8_UL/*.root \
+run2_repuppi_qcd600to800:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_600to800_TuneCP5_13TeV_pythia8_UL/*.root \
+
 // old qcd... for recording
 run3_2023_qcd_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[0-2].root \
 run3_2023_qcd_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_170toInf_ptBinned_TuneCP5_13p6TeV_pythia8/*[3-5].root \
@@ -1141,3 +1159,410 @@ valextopts="-o eval_kw {'roc_kw':{'comp_list':[('Xbb','QCD'),('Xcc','QCD'),('Xcc
 testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta3 " # fetch-by-file
 
 source scripts/train_GloParT_v3_origQCD.sh run 0,1,2,3 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $trainopts --load-epoch 69
+source scripts/train_GloParT_v3_origQCD.sh run 3 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $valopts $valextopts --load-epoch 69
+source scripts/train_GloParT_v3_origQCD.sh dryrun 0 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $testopts
+
+// == training test ==
+
+source scripts/train_GloParT_v3_origQCD.sh dryrun 0 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 512 --start-lr 1e-3 $modelopts $trainopts --data-train ./datasets/20240909_ak8_UL17_PUPPIv18_v10/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*00.root --data-split-group 10
+
+<!-- ## 24.09.27 larger model
+
+PREFIX=ak8_MD_inclv10beta3_origQCD_manual.dim384.ddp4-bs384-lr8e-4.nepoch120.farm221 # 4GPU
+config=./data_new/inclv10/${PREFIX%%.*}.yaml
+
+modelopts="-o num_nodes 750 -o num_cls_nodes 374 -o loss_composed_split_reg [[True,True],[True,False]] --num-epochs 100 -o embed_dims [384,1536,384]"
+
+trainopts="--num-workers 3 --fetch-step 1. --data-split-group 320 " # on farm221
+valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 --log-file logs/${PREFIX}/val.log "
+valextopts="-o eval_kw {'roc_kw':{'comp_list':[('Xbb','QCD'),('Xcc','QCD'),('Xcc','Xbb')],'label_inds_map':{'Xbb':[0],'Xcc':[1],'QCD':[369,370,371,372,373]}}} "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta3 " # fetch-by-file
+
+source scripts/train_GloParT_v3_origQCD.sh run 0,1,2,3 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 384 --start-lr 8e-4 $modelopts $trainopts
+source scripts/train_GloParT_v3_origQCD.sh run 3 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 384 --start-lr 8e-4 $modelopts $valopts $valextopts
+source scripts/train_GloParT_v3_origQCD.sh dryrun 0 --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 384 --start-lr 8e-4 $modelopts $testopts -->
+
+
+### beta 4: switched to UL samples -> card + bash script changes
+// card: QCD weight back to 1..
+
+// change samples:
+// - higgsbsm2p(hm) -> to new dir
+// - ttbar(hm) -> to new dir
+// - haa + haa4p -> to new dir
+
+// get sample weights
+
+PREFIX=ak8_MD_inclv10beta4_ul.ddp-bs512-lr7e-4.nepoch100
+config=./data_new/inclv10/${PREFIX%%.*}.yaml
+
+modelopts="--num-epochs 100 "
+
+trainopts="--num-workers 8 --fetch-step 1. --data-split-group 250 " # large memory setup
+valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3pre " # fetch-by-file
+
+source scripts/train_GloParT_v3beta4.sh run cpu --network-config networks/example_ParticleTransformer2024PlusTagger_unified.py --batch-size 256 --start-lr 7e-4 $modelopts $trainopts --log-file logs/${PREFIX}/pre_train.log --print
+
+// training
+
+PREFIX=ak8_MD_inclv10beta4_ul.ddp4-bs640-lr1p2e-3.nepoch100.farm221 # 4GPU
+PREFIX=ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100.farm221 # 4GPU
+config=./data_new/inclv10/${PREFIX%%.*}.yaml
+
+modelopts=""
+
+trainopts="--num-workers 3 --fetch-step 1. --data-split-group 320 " # on farm221
+valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 --log-file logs/${PREFIX}/val.log "
+valextopts="-o eval_kw {'roc_kw':{'comp_list':[('Xbb','QCD'),('Xcc','QCD'),('Xcc','Xbb'),('XWW4q','QCD'),('XWW4q','TopbWhad'),('TopbWhad','QCD')],'label_inds_map':{'Xbb':[0],'Xcc':[1],'XWW4q':[50,51,52],'TopbWhad':[16,17,18,19,20,33,34,35,36,37],'QCD':[369,370,371,372,373]}}} "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta3 " # fetch-by-file
+
+source scripts/train_GloParT_v3beta4.sh run 4,5,6,7 --batch-size 640 --start-lr 1.2e-3 $modelopts $trainopts
+source scripts/train_GloParT_v3beta4.sh run 3 --batch-size 640 --start-lr 1.2e-3 $modelopts $valopts $valextopts
+source scripts/train_GloParT_v3beta4.sh dryrun 3 --batch-size 512 --start-lr 1e-3 $modelopts $testopts
+
+// == training test ==
+
+source scripts/train_GloParT_v3beta4.sh dryrun 0 --batch-size 256 --start-lr 1e-3 $modelopts $trainopts --data-train ./datasets/20240909_ak8_UL17_PUPPIv18_v10/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*00.root --data-split-group 10
+
+// test onnx model
+extopts="--data-test onnxtest:/home/olympus/licq/hww/incl-train/weaver-core/weaver/output_numEvent100.root "
+source scripts/train_GloParT_v3beta4.sh dryrun 3 --batch-size 512 --start-lr 1e-3 $modelopts $testopts $extopts
+
+### beta 4a: back to 10 layers
+// add -o num_layers 10
+// change as_resid_of to [1]
+
+PREFIX=ak8_MD_inclv10beta4_ul_manual.nlayer10.vispart_as_resid.ddp4-bs640-lr1p2e-3.nepoch100.farm221 # 4GPU
+config=./data_new/inclv10/${PREFIX%%.*}.yaml
+
+modelopts="-o num_layers 10 -o reg_kw {'gamma':5.,'composed_split_reg':[True,False],'as_resid_of':[1]} "
+
+trainopts="--num-workers 3 --fetch-step 1. --data-split-group 320 " # on farm221
+valopts="--run-mode val --num-workers 20 --fetch-step 1. --data-split-group 125 --log-file logs/${PREFIX}/val.log "
+valextopts="-o eval_kw {'roc_kw':{'comp_list':[('Xbb','QCD'),('Xcc','QCD'),('Xcc','Xbb'),('XWW4q','QCD'),('XWW4q','TopbWhad'),('TopbWhad','QCD')],'label_inds_map':{'Xbb':[0],'Xcc':[1],'XWW4q':[50,51,52],'TopbWhad':[16,17,18,19,20,33,34,35,36,37],'QCD':[369,370,371,372,373]}}} "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 -o label_cls_nodes $label_cls_nodes_v3beta3 " # fetch-by-file
+
+source scripts/train_GloParT_v3beta4.sh run 4,5,6,7 --batch-size 640 --start-lr 1.2e-3 $modelopts $trainopts --load-epoch 25
+source scripts/train_GloParT_v3beta4.sh run 3 --batch-size 640 --start-lr 1.2e-3 $modelopts $valopts $valextopts
+source scripts/train_GloParT_v3beta4.sh dryrun 3 --batch-size 512 --start-lr 1e-3 $modelopts $testopts
+
+
+========================================================================================================
+# Stage-3 aux tasks
+
+## non-MD for v3 beta4
+
+PREFIX=ak8_MD_inclv10_nonmd_manual.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100
+PREFIX=ak8_MD_inclv10_nonmd_manual.lr2e-2.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5
+PREFIX=ak8_MD_inclv10_nonmd_manual.lr2e-2_try2.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5, try2
+// fixing the nonMD script to merge all QCD samples
+PREFIX=ak8_MD_inclv10_nonmd_manual.lr2e-2.fixqcd.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5, try2
+
+config=./data_new/inclv10_aux/${PREFIX%%.*}.yaml
+
+modelopts="" # beta 4's config
+modelftopts="-o finetune_kw {'mode':'cls','target_inds':[16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,7,3,0,1,2,3,369,370,371,372,373],'num_ft_nodes':28,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode cls --num-epochs 30 "
+
+trainopts="--run-mode train,val --num-workers 20 --fetch-step 1. --data-split-group 125 --samples-per-epoch-val $((1000 * 512)) "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
+
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh run 3 --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $trainopts
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 1 --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $testopts
+
+
+// == training test ==
+
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 1 --batch-size 512 --start-lr 4e-3 $modelopts $modelftopts $trainopts --data-train ./datasets/20230826_ak8_UL17_v9/v9-nonMD/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/dnnTuples_6839710-36.root --data-split-group 3 --samples-per-epoch 5120 --samples-per-epoch-val 512
+
+// test onnx model to check hidden layer is exactly the same
+extopts="--data-test onnxtest:/home/olympus/licq/hww/incl-train/weaver-core/weaver/output_numEvent100.root "
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 1 --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $testopts $extopts --model-prefix model/${PREFIX}/net_epoch-0_state.pt
+
+
+<!-- ## non-MD for v3 beta4 (top+QCD only)
+
+PREFIX=ak8_MD_inclv10_nonmd_toponly.lr2e-2.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5
+config=./data_new/inclv10_aux/${PREFIX%%.*}.yaml
+
+extdataopts="--data-train \
+t_qcd170to300:./datasets/20230504_ak8_UL17_v8/QCD_Pt_170to300_TuneCP5_13TeV_pythia8/*.root \
+t_qcd300to470:./datasets/20230504_ak8_UL17_v8/QCD_Pt_300to470_TuneCP5_13TeV_pythia8/*.root \
+t_qcd470to600:./datasets/20230504_ak8_UL17_v8/QCD_Pt_470to600_TuneCP5_13TeV_pythia8/*.root \
+t_qcd600to800:./datasets/20230504_ak8_UL17_v8/QCD_Pt_600to800_TuneCP5_13TeV_pythia8/*.root \
+t_qcd800to1000:./datasets/20230504_ak8_UL17_v8/QCD_Pt_800to1000_TuneCP5_13TeV_pythia8/*.root \
+t_qcd1000to1400:./datasets/20230504_ak8_UL17_v8/QCD_Pt_1000to1400_TuneCP5_13TeV_pythia8/*.root \
+t_qcd1400to1800:./datasets/20230504_ak8_UL17_v8/QCD_Pt_1400to1800_TuneCP5_13TeV_pythia8/*.root \
+t_qcd1800to2400:./datasets/20230504_ak8_UL17_v8/QCD_Pt_1800to2400_TuneCP5_13TeV_pythia8/*.root \
+t_qcd2400to3200:./datasets/20230504_ak8_UL17_v8/QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8/*.root \
+t_qcd3200toinf:./datasets/20230504_ak8_UL17_v8/QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8/*.root \
+t_smttbar:./datasets/20230826_ak8_UL17_v9/v9-nonMD/ZprimeToTT_M1200to4500_W12to45_TuneCP2_PSweights/*.root "
+
+modelopts="" # beta 4's config
+modelftopts="-o finetune_kw {'mode':'cls','target_inds':[16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,369,370,371,372,373],'num_ft_nodes':22,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode cls --num-epochs 30 "
+
+trainopts="--run-mode train,val --num-workers 20 --fetch-step 1. --data-split-group 125 --samples-per-epoch-val $((1000 * 512)) "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
+
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh run 0 --batch-size 512 --start-lr 2e-2 $extdataopts $modelopts $modelftopts $trainopts
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 1 --batch-size 512 --start-lr 2e-2 $extdataopts $modelopts $modelftopts $testopts -->
+
+## non-MD for v3 beta4, adding suffix FC after main network
+// use fc_suff: add 'fc_suff_kw':[] to finetune_kw
+
+PREFIX=ak8_MD_inclv10_nonmd_manual.lr2e-2.usefcsuff.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5
+config=./data_new/inclv10_aux/${PREFIX%%.*}.yaml
+
+modelopts="" # beta 4's config
+modelftopts="-o finetune_kw {'mode':'cls','target_inds':'all','num_ft_nodes':28,'fc_params':[(256,0.),(256,0.)],'fc_suff_kw':{'params':[]}} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode cls --num-epochs 30 "
+
+trainopts="--run-mode train,val --num-workers 20 --fetch-step 1. --data-split-group 125 --samples-per-epoch-val $((1000 * 512)) "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
+
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh run 0 --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $trainopts
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 1 --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $testopts
+
+## non-MD for v3 beta4, adding suffix FC directly after hidden layer (same configs eventually with stage-2...)
+// use fc_suff: add 'fc_suff_kw':[] to finetune_kw
+
+PREFIX=ak8_MD_inclv10_nonmd_manual.lr2e-2.usefcsuff_afterfc0.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5
+PREFIX=ak8_MD_inclv10_nonmd_manual.lr2e-2.fixqcd.usefcsuff_afterfc0.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5
+config=./data_new/inclv10_aux/${PREFIX%%.*}.yaml
+
+modelopts="" # beta 4's config
+modelftopts="-o finetune_kw {'mode':'cls','target_inds':'all','num_ft_nodes':28,'fc_params':[(256,0.),(256,0.)],'fc_suff_kw':{'append_after':'fc.0','params':[]}} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode cls --num-epochs 30 "
+
+trainopts="--run-mode train,val --num-workers 20 --fetch-step 1. --data-split-group 125 --samples-per-epoch-val $((1000 * 512)) "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
+
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh run 0 --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $trainopts
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 1 --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $testopts
+
+## [!!] Fix dataloader.. here you definately shouldnt use --data-split-group
+
+PREFIX=ak8_MD_inclv10_nonmd_manual.lr2e-2.fixdataloader.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5, try2
+modelftopts="-o finetune_kw {'mode':'cls','target_inds':[16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,7,3,0,1,2,3,369,370,371,372,373],'num_ft_nodes':28,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode cls --num-epochs 30 "
+
+PREFIX=ak8_MD_inclv10_nonmd_manual.lr2e-2.fixdataloader.usefcsuff_afterfc0.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5
+modelftopts="-o finetune_kw {'mode':'cls','target_inds':'all','num_ft_nodes':28,'fc_params':[(256,0.),(256,0.)],'fc_suff_kw':{'append_after':'fc.0','params':[]}} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode cls --num-epochs 30 "
+
+// want to understand why initial v3 nonMD setup cannot work
+PREFIX=ak8_MD_inclv10_nonmd_manual.lr2e-2.fixdataloader.ignore_main_output.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5, try2
+modelftopts="-o finetune_kw {'mode':'cls','target_inds':None,'num_ft_nodes':28,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode cls --num-epochs 30 "
+
+// final test, changed to 512-512
+PREFIX=ak8_MD_inclv10_nonmd_manual.lr2e-2.aux512-512.fixdataloader.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5, try2
+modelftopts="-o finetune_kw {'mode':'cls','target_inds':[16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,7,3,0,1,2,3,369,370,371,372,373],'num_ft_nodes':28,'fc_params':[(512,0.),(512,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode cls --num-epochs 30 "
+
+// add eta
+PREFIX=ak8_MD_inclv10_nonmd_witheta_manual.lr2e-2.fixdataloader.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100 ## LRx5, try2
+modelftopts="-o finetune_kw {'mode':'cls','target_inds':[16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,7,3,0,1,2,3,369,370,371,372,373],'num_ft_nodes':28,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode cls --num-epochs 30 "
+
+config=./data_new/inclv10_aux/${PREFIX%%.*}.yaml
+modelopts="" # beta 4's config
+trainopts="--run-mode train,val --num-workers 16 --fetch-step 0.01 --data-split-group 1 --samples-per-epoch-val $((1000 * 512)) "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
+
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh run 3 --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $trainopts
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 3 --batch-size 512 --start-lr 2e-2 $modelopts $modelftopts $testopts
+
+
+
+## 24.10.04 study on H->bb regression with GuassianNLLLoss
+
+PREFIX=ak8_MD_inclv10_reg_guass_hbb.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100
+PREFIX=ak8_MD_inclv10_reg_guass_hbb.lr4e-3.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100
+config=./data_new/inclv10_aux/${PREFIX%%.*}.yaml
+
+extdataopts="--data-train \
+t_h2p:./datasets/20230504_ak8_UL17_v8/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*.root \
+t_h2phm:./datasets/20230504_ak8_UL17_v8_ext1/BulkGravitonToHHTo4QGluLTau_MX-Var_MH-260to650/*.root \
+--data-test \
+higlo_part0:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[0-2].root \
+higlo_part1:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[3-5].root \
+higlo_part2:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[6-9].root "
+
+modelopts="" # beta 4's config
+modelftopts="-o finetune_kw {'mode':'reg.guass','target_inds':[374,376],'target_inds_opt':'sum','num_ft_nodes':2,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode regression --num-epochs 30 "
+
+trainopts="--run-mode train,val --num-workers 20 --fetch-step 1. --data-split-group 50 --samples-per-epoch-val $((1000 * 512)) "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
+
+//source scripts/aux/train_GloParT_v3beta4_nonMD.sh run 2 --batch-size 512 --start-lr 2e-2 $extdataopts $modelopts $modelftopts $trainopts
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh run 1 --batch-size 512 --start-lr 4e-3 $extdataopts $modelopts $modelftopts $trainopts
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 1 --batch-size 512 --start-lr 2e-2 $extdataopts $modelopts $modelftopts $testopts
+
+### a quick try for fine-tuning
+// - add 'freeze_main_params':False to finetune_kw
+// - remove --freeze-model-weights and instead add --optimizer-option lr_mult ("main*",1e-1)
+
+PREFIX=ak8_MD_inclv10_reg_guass_hbb.finetune_lrmult0p1.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100
+config=./data_new/inclv10_aux/${PREFIX%%.*}.yaml
+
+extdataopts="--data-train \
+t_h2p:./datasets/20230504_ak8_UL17_v8/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*.root \
+t_h2phm:./datasets/20230504_ak8_UL17_v8_ext1/BulkGravitonToHHTo4QGluLTau_MX-Var_MH-260to650/*.root \
+--data-test \
+higlo_part0:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[0-2].root \
+higlo_part1:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[3-5].root \
+higlo_part2:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[6-9].root "
+
+modelopts="" # beta 4's config
+modelftopts="-o finetune_kw {'mode':'reg.guass','target_inds':[374,376],'target_inds_opt':'sum','num_ft_nodes':2,'fc_params':[(256,0.),(256,0.)],'freeze_main_params':False} \
+--load-model-weights finetune_stage3beta4 --optimizer-option lr_mult ('main.*',1e-1) \
+--train-mode regression --num-epochs 30 "
+
+trainopts="--run-mode train,val --num-workers 20 --fetch-step 1. --data-split-group 50 --samples-per-epoch-val $((1000 * 512)) "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
+
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh run 0 --batch-size 512 --start-lr 2e-2 $extdataopts $modelopts $modelftopts $trainopts
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 2 --batch-size 512 --start-lr 2e-2 $extdataopts $modelopts $modelftopts $testopts
+
+## 24.10.04 normal regression (change to --fetch-step mechanism)
+
+PREFIX=ak8_MD_inclv10_reg_guass_hbb.stdlogcosh.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100
+modelftopts="-o finetune_kw {'mode':'reg','target_inds':[374,376],'target_inds_opt':'sum','num_ft_nodes':1,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode regression --num-epochs 30 "
+
+PREFIX=ak8_MD_inclv10_reg_guass_hbb.lr1e-4.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100
+modelftopts="-o finetune_kw {'mode':'reg.guass','target_inds':[374,376],'target_inds_opt':'sum','num_ft_nodes':2,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode regression --num-epochs 30 --start-lr 1e-4"
+
+PREFIX=ak8_MD_inclv10_reg_guass_hbb.lr1e-4.mseloss.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100
+modelftopts="-o finetune_kw {'mode':'reg.mse','target_inds':[374,376],'target_inds_opt':'sum','num_ft_nodes':1,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode regression --num-epochs 30 --start-lr 1e-4"
+
+PREFIX=ak8_MD_inclv10_reg_guass_hbb.lr1e-4.guass_fixvarto1.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100
+modelftopts="-o finetune_kw {'mode':'reg.guass.fixvar','target_inds':[374,376],'target_inds_opt':'sum','num_ft_nodes':1,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode regression --num-epochs 30 --start-lr 1e-4"
+
+/// finally catch the bug... rerun guassian nll test
+
+
+extdataopts="--data-train \
+t_h2p:./datasets/20230504_ak8_UL17_v8/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*.root \
+t_h2phm:./datasets/20230504_ak8_UL17_v8_ext1/BulkGravitonToHHTo4QGluLTau_MX-Var_MH-260to650/*.root \
+--data-test \
+higlo_part0:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[0-2].root \
+higlo_part1:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[3-5].root \
+higlo_part2:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[6-9].root \
+qcd170to300:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_170to300_TuneCP5_13TeV_pythia8/*.root \
+qcd300to470:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_300to470_TuneCP5_13TeV_pythia8/*.root \
+qcd470to600:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_470to600_TuneCP5_13TeV_pythia8/*.root \
+qcd600to800:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_600to800_TuneCP5_13TeV_pythia8/*.root \
+qcd800to1000:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_800to1000_TuneCP5_13TeV_pythia8/*.root \
+qcd1000to1400:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_1000to1400_TuneCP5_13TeV_pythia8/*.root \
+qcd1400to1800:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_1400to1800_TuneCP5_13TeV_pythia8/*.root \
+qcd1800to2400:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_1800to2400_TuneCP5_13TeV_pythia8/*.root \
+qcd2400to3200:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8/*.root \
+qcd3200toinf:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8/*.root "
+
+config=./data_new/inclv10_aux/${PREFIX%%.*}.yaml
+modelopts="" # beta 4's config
+trainopts="--run-mode train,val --num-workers 20 --fetch-step 0.01 --data-split-group 1 --samples-per-epoch-val $((1000 * 512)) "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
+
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh run 2 --batch-size 512 --start-lr 2e-2 $extdataopts $modelopts $modelftopts $trainopts
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 2 --batch-size 512 --start-lr 2e-2 $extdataopts $modelopts $modelftopts $testopts
+
+## 24.10.06 regression on rePUPPI samples
+
+PREFIX=ak8_MD_inclv10_reg_guass_hbb.repuppi_nepoch30.stdlogcosh.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100
+modelftopts="-o finetune_kw {'mode':'reg','target_inds':[375],'num_ft_nodes':1,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode regression --num-epochs 30 "
+
+// add eta
+PREFIX=ak8_MD_inclv10_reghbb_witheta_manual.repuppi_nepoch30.stdlogcosh.origmodel.ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100
+modelftopts="-o finetune_kw {'mode':'reg','target_inds':[375],'num_ft_nodes':1,'fc_params':[(256,0.),(256,0.)]} \
+--load-model-weights finetune_stage3beta4 --freeze-model-weights main* \
+--train-mode regression --num-epochs 30 "
+
+extdataopts="--data-train \
+trpp_h2p:./datasets/20240909_ak8_UL17_PUPPIv18_v10/BulkGravitonToHHTo4QGluLTau_MX-600to6000_MH-15to250/*.root \
+trpp_h2phm:./datasets/20240909_ak8_UL17_PUPPIv18_v10/BulkGravitonToHHTo4QGluLTau_MX-Var_MH-260to650/*.root \
+--data-test \
+higlo_part0:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[0-2].root \
+higlo_part1:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[3-5].root \
+higlo_part2:./datasets/20230504_ak8_UL17_v8/infer/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_RatioMGMH-8_narrow/*[6-9].root \
+qcd170to300:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_170to300_TuneCP5_13TeV_pythia8/*.root \
+qcd300to470:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_300to470_TuneCP5_13TeV_pythia8/*.root \
+qcd470to600:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_470to600_TuneCP5_13TeV_pythia8/*.root \
+qcd600to800:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_600to800_TuneCP5_13TeV_pythia8/*.root \
+qcd800to1000:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_800to1000_TuneCP5_13TeV_pythia8/*.root \
+qcd1000to1400:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_1000to1400_TuneCP5_13TeV_pythia8/*.root \
+qcd1400to1800:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_1400to1800_TuneCP5_13TeV_pythia8/*.root \
+qcd1800to2400:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_1800to2400_TuneCP5_13TeV_pythia8/*.root \
+qcd2400to3200:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8/*.root \
+qcd3200toinf:./datasets/20230504_ak8_UL17_v8/infer/QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8/*.root \
+run3_2023_qcd170to300:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_170to300_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd300to470:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_300to470_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd470to600:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_470to600_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd600to800:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_600to800_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd800to1000:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_800to1000_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd1000to1400:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_1000to1400_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd1400to1800:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_1400to1800_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd1800to2400:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_1800to2400_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd2400to3200:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_2400to3200_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_qcd3200toinf:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/QCD_Pt_3200toInf_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023_higlo_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[0-2].root \
+run3_2023_higlo_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[3-5].root \
+run3_2023_higlo_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[6-9].root \
+run3_2023bpix_qcd170to300:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_170to300_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd300to470:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_300to470_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd470to600:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_470to600_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd600to800:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_600to800_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd800to1000:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_800to1000_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd1000to1400:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_1000to1400_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd1400to1800:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_1400to1800_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd1800to2400:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_1800to2400_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd2400to3200:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_2400to3200_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_qcd3200toinf:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/QCD_Pt_3200toInf_TuneCP5_13p6TeV_pythia8/*.root \
+run3_2023bpix_higlo_part0:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[0-2].root \
+run3_2023bpix_higlo_part1:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[3-5].root \
+run3_2023bpix_higlo_part2:./datasets/20240824_ak8_Run3_v10/infer_Run3_2023BPix/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[6-9].root \
+run2_repuppi_qcd170to300:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_170to300_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd300to470:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_300to470_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd470to600:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_470to600_TuneCP5_13TeV_pythia8_UL18/*.root \
+run2_repuppi_qcd600to800:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_600to800_TuneCP5_13TeV_pythia8_UL18/*.root \
+run2_repuppi_qcd800to1000:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_800to1000_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd1000to1400:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_1000to1400_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd1400to1800:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_1400to1800_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd1800to2400:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_1800to2400_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd2400to3200:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_2400to3200_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_qcd3200toinf:./datasets/20240824_ak8_Run3_v10/infer_UL17/QCD_Pt_3200toInf_TuneCP5_13TeV_pythia8/*.root \
+run2_repuppi_higlo_part0:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[0-2].root \
+run2_repuppi_higlo_part1:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[3-5].root \
+run2_repuppi_higlo_part2:./datasets/20240824_ak8_Run3_v10/infer_UL17/GluGluToBulkGravitonToHHTo4QGluLTau_MH-50-125-250-300_LowPt_narrow/*[6-9].root "
+
+config=./data_new/inclv10_aux/${PREFIX%%.*}.yaml
+modelopts="" # beta 4's config
+trainopts="--run-mode train,val --num-workers 20 --fetch-step 0.01 --data-split-group 1 --samples-per-epoch-val $((1000 * 512)) "
+testopts="--run-mode test --num-workers 3 --data-split-group 1 " # fetch-by-file
+
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh run 7 --batch-size 512 --start-lr 2e-2 $extdataopts $modelopts $modelftopts $trainopts
+source scripts/aux/train_GloParT_v3beta4_nonMD.sh dryrun 2 --batch-size 512 --start-lr 2e-2 $extdataopts $modelopts $modelftopts $testopts

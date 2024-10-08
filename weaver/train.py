@@ -698,6 +698,16 @@ def model_setup(args, data_config):
                 if key.startswith('m_weight.'):
                     state_dict[key].copy_(weight_model_state[key.replace('m_weight.', '')].data)
                     print(f'Copy weight model params: {key}')
+        
+        # for stage3 model
+        elif args.load_model_weights.startswith('finetune_stage3'):
+            if args.load_model_weights.startswith('finetune_stage3beta4'):
+                model_state = torch.load("./model/ak8_MD_inclv10beta4_ul_manual.ddp4-bs640-lr1p2e-3.nepoch100.farm221/net_best_epoch_state.pt", map_location='cpu')
+                model_state = {f'main.{k}': v for k, v in model_state.items()}
+                missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
+                assert len(unexpected_keys) == 0
+                _logger.info('Model initialized with weights from GloParT v3beta4\n ... Missing: %s\n ... Unexpected: %s' %
+                        (missing_keys, unexpected_keys))
 
         else:
             # this is the default setup
@@ -1123,7 +1133,9 @@ def main():
     if args.steps_per_epoch_val is not None and args.steps_per_epoch_val < 0:
         args.steps_per_epoch_val = None
 
-    args.data_split_num = args.data_split_group
+    if args.data_split_group > 1:
+        assert args.data_split_num == 1
+        args.data_split_num = args.data_split_group
 
     if '{auto}' in args.model_prefix or '{auto}' in args.log_file:
         import hashlib
