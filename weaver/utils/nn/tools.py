@@ -3,6 +3,7 @@ import awkward as ak
 import tqdm
 import time
 import torch
+import torch.distributed as dist
 
 from collections import defaultdict, Counter
 from .metrics import evaluate_metrics
@@ -28,6 +29,36 @@ def _flatten_preds(preds, mask=None, label_axis=1):
             preds = preds[mask.view(-1)]
     # print('preds', preds.shape, preds)
     return preds
+
+
+class AllGather(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, x):
+        if (
+            dist.is_available()
+            and dist.is_initialized()
+            and (dist.get_world_size() > 1)
+        ):
+            x = x.contiguous()
+            outputs = [torch.zeros_like(x) for _ in range(dist.get_world_size())]
+            dist.all_gather(outputs, x)
+            return torch.cat(outputs, 0)
+        return x
+
+    @staticmethod
+    def backward(ctx, grads):
+        if (
+            dist.is_available()
+            and dist.is_initialized()
+            and (dist.get_world_size() > 1)
+        ):
+            s = (grads.shape[0] // dist.get_world_size()) * dist.get_rank()
+            e = (grads.shape[0] // dist.get_world_size()) * (dist.get_rank() + 1)
+            grads = grads.contiguous()
+            dist.all_reduce(grads)
+            return grads[s:e]
+        return grads
 
 
 def train_classification(model, loss_func, opt, scheduler, train_loader, dev, epoch, steps_per_epoch=None, grad_scaler=None, tb_helper=None):

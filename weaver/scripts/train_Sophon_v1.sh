@@ -26,8 +26,8 @@ valset_res2p=$(for i in $(seq -w 0200 0249); do echo -n "${DATADIR}/Pythia/Res2P
 valset_res34p=$(for i in $(seq -w 0860 1074); do echo -n "${DATADIR}/Pythia/Res34P_$i.parquet "; done)
 valset_qcd=$(for i in $(seq -w 0280 0349); do echo -n "${DATADIR}/Pythia/QCD_$i.parquet "; done)
 
-ARG="--network-config networks/pheno2/example_ParticleTransformer_sophon.py -o num_classes 188 -o fc_params [(512,0.1)] \
---use-amp --batch-size 512 --start-lr 5e-4 --samples-per-epoch $((10000 * 1024 / $NGPUS)) --samples-per-epoch-val $((2500 * 1024)) --num-epochs 80 --optimizer ranger \
+ARG="--network-config networks/pheno2/example_Sophon.py -o num_classes 188 -o fc_params [(512,0.1)] \
+--use-amp --batch-size 512 --start-lr 5e-4 --samples-per-epoch $((10000 * 1024 / $NGPUS)) --samples-per-epoch-val $((2500 * 1024 / $NGPUS)) --num-epochs 80 --optimizer ranger \
 --num-workers 5 --fetch-step 1.0 --data-split-num 200 \
 --data-train $trainset_res2p $trainset_res34p $trainset_qcd \
 --data-val $valset_res2p $valset_res34p $valset_qcd \

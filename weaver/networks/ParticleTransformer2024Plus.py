@@ -676,7 +676,7 @@ class Block(nn.Module):
         """
         Args:
             x (Tensor): input to the layer of shape `(batch, seq_len, embed_dim)`
-            x_cls (Tensor, optional): class token input to the layer of shape `(batch, 1, embed_dim)`
+            x_cls (Tensor, optional): class token input to the layer of shape `(batch, num_cls_token, embed_dim)`
             padding_mask (ByteTensor, optional): binary
                 ByteTensor of shape `(batch, seq_len)` where padding
                 elements are indicated by ``True``.
@@ -687,13 +687,13 @@ class Block(nn.Module):
 
         if x_cls is not None:
             with torch.no_grad():
-                # prepend one element for x_cls: -> (batch, 1+seq_len)
-                padding_mask = torch.cat((torch.zeros_like(padding_mask[:, :1]), padding_mask), dim=1)
+                # prepend one element for x_cls: -> (batch, num_cls_token+seq_len)
+                padding_mask = torch.cat((torch.zeros(x_cls.shape[0], x_cls.shape[1]).to(padding_mask), padding_mask), dim=1)
             # class attention: https://arxiv.org/pdf/2103.17239.pdf
             residual = x_cls
-            u = torch.cat((x_cls, x), dim=1)  # (batch, 1+seq_len, embed_dim)
+            u = torch.cat((x_cls, x), dim=1)  # (batch, num_cls_token+seq_len, embed_dim)
             u = self.pre_attn_norm(u)
-            x = self.attn(x_cls, u, u, key_padding_mask=padding_mask)[0]  # (1, batch, embed_dim)
+            x = self.attn(x_cls, u, u, key_padding_mask=padding_mask)[0]  # (batch, num_cls_token, embed_dim)
         else:
             if self.c_mask is not None and attn_mask is not None:
                 attn_mask = torch.mul(self.c_mask, attn_mask)
@@ -748,6 +748,7 @@ class ParticleTransformer(nn.Module):
                  num_heads=8,
                  num_layers=8,
                  num_cls_layers=2,
+                 num_cls_tokens=1,
                  block_params=None,
                  cls_block_params=None,
                  fc_params=(),
@@ -821,7 +822,7 @@ class ParticleTransformer(nn.Module):
 
         # cls tokens
         if not self.for_segmentation and num_cls_layers > 0:
-            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim), requires_grad=True)
+            self.cls_token = nn.Parameter(torch.zeros(1, num_cls_tokens, embed_dim), requires_grad=True)
             nn.init.trunc_normal_(self.cls_token, std=.02)
         else:
             self.cls_token = None
@@ -878,10 +879,11 @@ class ParticleTransformer(nn.Module):
         with torch.autocast('cuda', enabled=self.use_amp):
             if self.cls_blocks is not None:
                 # for classification: extract using class token
-                cls_tokens = self.cls_token.expand(x.size(0), 1, -1)  # (batch, 1, embed_dim)
+                cls_tokens = self.cls_token.expand(x.size(0), -1, -1)  # (batch, num_cls_token, embed_dim)
                 for block in self.cls_blocks:
-                    cls_tokens = block(x, x_cls=cls_tokens, padding_mask=padding_mask)  # (batch, 1, embed_dim)
-                cls_tokens = cls_tokens.squeeze(1)  # (batch, embed_dim)
+                    cls_tokens = block(x, x_cls=cls_tokens, padding_mask=padding_mask)  # (batch, num_cls_token, embed_dim)
+                if cls_tokens.size(1) == 1:
+                    cls_tokens = cls_tokens.squeeze(1)  # (batch, embed_dim)
             else:
                 # for classification: simple average pooling
                 mask = ~padding_mask.unsqueeze(1)  # (batch, 1, seq_len)
@@ -1047,6 +1049,7 @@ class ParticleTransformerTagger_ncoll(nn.Module):
                  num_heads=8,
                  num_layers=8,
                  num_cls_layers=2,
+                 num_cls_tokens=1,
                  block_params=None,
                  cls_block_params=None,
                  fc_params=(),
@@ -1087,6 +1090,7 @@ class ParticleTransformerTagger_ncoll(nn.Module):
                                         num_heads=num_heads,
                                         num_layers=num_layers,
                                         num_cls_layers=num_cls_layers,
+                                        num_cls_tokens=num_cls_tokens,
                                         block_params=block_params,
                                         cls_block_params=cls_block_params,
                                         fc_params=fc_params,
