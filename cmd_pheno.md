@@ -2376,7 +2376,7 @@ trainvalopts="--run-mode train,val --num-workers 3 --fetch-step 1. --data-split-
 
 source scripts/train_Sophon_v1.sh run 0,2 --batch-size 1024 --start-lr 6e-3 $modelopts $extselection $trainvalopts
 
-### formal runs
+### formal runs on zeus
 
 PREFIX=JetClassII_full_CLIP_nonscale_manual.data0p1.clip-with-cls.share_token.ddp2-bs1536-lr2e-3
 modelopts="--network-config networks/pheno2/example_Sophon_CLIP.py -o clip_kw {'mode':'clip-with-cls','share_token':True,'main_cont_fc_parmas':[(512,0.1)],'beta':1.} " # use single class token
@@ -2393,3 +2393,20 @@ extselection="--extra-selection (ak.values_astype(np.tan(jet_energy)*100000,'int
 trainvalopts="--run-mode train,val --num-workers 3 --fetch-step 1. --data-split-num 50 --log-file logs/${PREFIX}/train_val.log --data-train $trainset0p1_res2p $trainset0p1_res34p $trainset0p1_qcd --samples-per-epoch $((1000 * 1024 / $NGPUS))"
 
 source scripts/train_Sophon_v1.sh run 0,2 --batch-size 1536 --start-lr 2e-3 $modelopts $extselection $trainvalopts
+
+### formal runs on ihep
+
+PREFIX=JetClassII_full_CLIP_nonscale_manual.data0p1.clip-with-cls.share_token.beta10.ddp4-bs2048-lr6e-3
+modelopts="--network-config networks/pheno2/example_Sophon_CLIP.py -o clip_kw {'mode':'clip-with-cls','share_token':True,'main_cont_fc_parmas':[(512,0.1)],'beta':10.} " # use single class token
+
+config=./data_pheno/JetClassII_v2/${PREFIX%%.*}.yaml
+DATADIR=/publicfs/cms/user/licq/datasets/JetClassII # ihep
+trainset0p1_res2p=$(for i in $(seq -w 0000 0019); do echo -n "Res2P:${DATADIR}/Pythia/Res2P_$i.parquet "; done)
+trainset0p1_res34p=$(for i in $(seq -w 0000 0085); do echo -n "Res34P:${DATADIR}/Pythia/Res34P_$i.parquet "; done)
+trainset0p1_qcd=$(for i in $(seq -w 0000 0027); do echo -n "QCD:${DATADIR}/Pythia/QCD_$i.parquet "; done)
+
+NGPUS=4
+extselection="--extra-selection-train (ak.values_astype(np.tan(jet_energy)*100000,'int')%5==0) "
+trainvalopts="--run-mode train,val --num-workers 3 --fetch-step 1. --data-split-num 50 --log-file logs/${PREFIX}/train_val.log --data-train $trainset0p1_res2p $trainset0p1_res34p $trainset0p1_qcd --samples-per-epoch $((1000 * 1024 / $NGPUS))"
+
+source scripts/train_Sophon_v1.sh run 0,1,2,3 --batch-size 2048 --start-lr 6e-3 $modelopts $extselection $trainvalopts 

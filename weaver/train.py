@@ -33,6 +33,12 @@ parser.add_argument('--use-last-model', action='store_true', default=False,
                     help='Simply take the last model as the best model')
 parser.add_argument('--extra-selection', type=str, default=None,
                     help='Additional selection requirement, will modify `selection` to `(selection) & (extra)` on-the-fly')
+parser.add_argument('--extra-selection-train', type=str, default=None,
+                    help='Additional selection requirement for training, will modify `selection` to `(selection) & (extra)` on-the-fly')
+parser.add_argument('--extra-selection-val', type=str, default=None,
+                    help='Additional selection requirement for validation, will modify `selection` to `(selection) & (extra)` on-the-fly')
+parser.add_argument('--extra-selection-test', type=str, default=None,
+                    help='Additional test-time selection requirement, will modify `test_time_selection` to `(test_time_selection) & (extra)` on-the-fly')
 parser.add_argument('--seed', type=int, default=-1,
                     help='Set seed for all torch, numpy utilities for reproducibility')
 parser.add_argument('-c', '--data-config', type=str, default='data/ak15_points_pf_sv_v0.yaml',
@@ -250,7 +256,7 @@ def train_load(args):
         raise RuntimeError('Must set --steps-per-epoch when using --in-memory!')
 
     train_data = SimpleIterDataset(train_file_dict, args.data_config, for_training=True,
-                                   extra_selection=args.extra_selection,
+                                   extra_selection=args.extra_selection_train,
                                    load_range_and_fraction=(train_range, args.data_fraction, args.data_split_num),
                                    file_fraction=args.file_fraction,
                                    fetch_by_files=args.fetch_by_files,
@@ -259,7 +265,7 @@ def train_load(args):
                                    in_memory=args.in_memory,
                                    name='train' + ('' if args.local_rank is None else '_rank%d' % args.local_rank))
     val_data = SimpleIterDataset(val_file_dict, args.data_config, for_training=True,
-                                 extra_selection=args.extra_selection,
+                                 extra_selection=args.extra_selection_val,
                                  load_range_and_fraction=(val_range, args.data_fraction, args.data_split_num),
                                  file_fraction=args.file_fraction,
                                  fetch_by_files=args.fetch_by_files,
@@ -319,6 +325,7 @@ def test_load(args):
         _logger.info('Running on test file group %s with %d files:\n...%s', name, len(filelist), '\n...'.join(filelist))
         num_workers = min(args.num_workers, len(filelist))
         test_data = SimpleIterDataset({name: filelist}, args.data_config, for_training=False,
+                                      extra_selection=args.extra_selection_test,
                                       load_range_and_fraction=(tuple(args.test_range), args.data_fraction, args.data_split_num),
                                       fetch_by_files=True, fetch_step=1,
                                     #   fetch_by_files=False, fetch_step=0.05,
@@ -1136,6 +1143,13 @@ def main():
     if args.data_split_group > 1:
         assert args.data_split_num == 1
         args.data_split_num = args.data_split_group
+    
+    if args.extra_selection is not None:
+        assert all(getattr(args, n) is None for n in ['extra_selection_train', 'extra_selection_val', 'extra_selection_test']), \
+            'Cannot use both `--extra-selection` and `--extra-selection-{train,val,test}`'
+        args.extra_selection_train = args.extra_selection
+        args.extra_selection_val = args.extra_selection
+        args.extra_selection_test = args.extra_selection
 
     if '{auto}' in args.model_prefix or '{auto}' in args.log_file:
         import hashlib

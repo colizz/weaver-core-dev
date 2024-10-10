@@ -84,14 +84,14 @@ class ParticleTransformerSophonCLIPWrapper(torch.nn.Module):
 
             self.mod = ParticleTransformer(**kwargs)
 
-            # initiate model for clip-finetune mode
+            # initialize model for clip-finetune mode
             assert clip_kw['init_path'] is not None, 'init_path must be provided for clip-finetune mode'
             init_model_state = {}
             for k, v in torch.load(clip_kw['init_path'], map_location='cpu').items():
                 if k.startswith('mod.'):
                     if k == 'mod.cls_token':
                         # special treatment for cls_token
-                        # if in shape [1, 2, dim] (two class tokens, one for classification, and one for CLIP contrastive loss), only take the first one
+                        # if in shape (1, 2, dim), i.e. two class tokens, one for classification, and one for CLIP contrastive loss, only take the first one
                         if v.shape[1] == 2:
                             init_model_state[k.replace('mod.', '', 1)] = v[:, 0:1]
                     else:
@@ -424,8 +424,8 @@ def evaluate_classification_sophon_clip(model, test_loader, dev, epoch, for_trai
                 num_batches += 1
                 count += num_examples
                 total_loss += loss * num_examples
-                total_loss_cls += loss_dict['loss_cls']
-                total_loss_cont += loss_dict['loss_cont']
+                total_loss_cls += loss_dict['loss_cls'] * num_examples
+                total_loss_cont += loss_dict['loss_cont'] * num_examples
                 tq_dict = {
                     'LossCls': '%.5f' % loss_dict['loss_cls'],
                     'LossCont': '%.5f' % loss_dict['loss_cont'],
