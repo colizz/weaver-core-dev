@@ -144,8 +144,8 @@ elif [ $RUN == "autorecover" ]; then
             break
         fi
         echo "Error: return code $ret"
-        # match model/${PREFIX}/net/net_epoch-(\d+)_state.pt and extract the maximum epoch number
-        maxepoch=$(ls model/${PREFIX}/net_epoch-*.pt | sed -n s/.*net_epoch-\([0-9]*\)_state.pt/\1/p | sort -n | tail -n 1)
+        # match model/${PREFIX}/net_epoch-(\d+)_state.pt and extract the maximum epoch number
+        maxepoch=$(ls model/${PREFIX}/net_epoch-*.pt | sed -n 's/.*net_epoch-\([0-9]*\)_state.pt/\1/p' | sort -n | tail -n 1)
         if [ -z $maxepoch ]; then
             epochopts=""
         else
