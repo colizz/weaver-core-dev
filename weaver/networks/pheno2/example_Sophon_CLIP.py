@@ -89,11 +89,10 @@ class ParticleTransformerSophonCLIPWrapper(torch.nn.Module):
             init_model_state = {}
             for k, v in torch.load(clip_kw['init_path'], map_location='cpu').items():
                 if k.startswith('mod.'):
-                    if k == 'mod.cls_token':
+                    if k == 'mod.cls_token' and v.shape[1] == 2:
                         # special treatment for cls_token
                         # if in shape (1, 2, dim), i.e. two class tokens, one for classification, and one for CLIP contrastive loss, only take the first one
-                        if v.shape[1] == 2:
-                            init_model_state[k.replace('mod.', '', 1)] = v[:, 0:1]
+                        init_model_state[k.replace('mod.', '', 1)] = v[:, 0:1]
                     else:
                         init_model_state[k.replace('mod.', '', 1)] = v
                 if k.startswith('mod_fc.'):
