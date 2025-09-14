@@ -1062,10 +1062,12 @@ class ParticleTransformerTagger_ncoll(nn.Module):
                  use_amp=False,
                  export_params=None,
                  return_embed=False,
+                 adapt_stage2_model=False,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
         self.use_amp = use_amp
+        self.adapt_stage2_model = adapt_stage2_model
 
         self.num_colls = len(input_dims)
         self.share_embed = share_embed
@@ -1107,6 +1109,23 @@ class ParticleTransformerTagger_ncoll(nn.Module):
     @torch.jit.ignore
     def no_weight_decay(self):
         return {'part.cls_token', }
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+        # Handle stage-2 model adaptation: replace cpf_embed keys with input_embeds.0
+        if self.adapt_stage2_model:
+            keys_to_replace = []
+            for k in state_dict.keys():
+                if (k.startswith('cpf_embed') or k.startswith('npf_embed') or k.startswith('sv_embed') or
+                    '.cpf_embed' in k or '.npf_embed' in k or '.sv_embed' in k):
+                    keys_to_replace.append(k)
+
+            for k in keys_to_replace:
+                new_key = k.replace('cpf_embed', 'input_embeds.0').replace('npf_embed', 'input_embeds.1').replace('sv_embed', 'input_embeds.2')
+                state_dict[new_key] = state_dict.pop(k)
+
+        super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
+                                      missing_keys, unexpected_keys, error_msgs)
 
     # def forward(self, cpf_x, cpf_v=None, cpf_mask=None, npf_x=None, npf_v=None, npf_mask=None, sv_x=None, sv_v=None, sv_mask=None):
     def forward(self, *args):
