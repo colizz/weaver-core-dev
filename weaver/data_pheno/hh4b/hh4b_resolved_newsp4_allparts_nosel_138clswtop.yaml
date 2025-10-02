@@ -1,0 +1,236 @@
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+#   1) trigger selection: require at least 3 of the 4 triggered AK4 jets b-tag discr > 0.0243 (LP, new SophonAK4)
+selection: >-
+   (gen_dihiggs_mass > -1)
+
+# test_time_selection: >-
+#    (gen_dihiggs_mass > -1)
+
+new_variables:
+   ### [format] name: formula
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   part_pt: np.hypot(part_px, part_py)
+   part_pt_log: np.log(part_pt)
+   part_e_log: np.log(part_energy)
+   part_logptrel: np.log(part_pt/pfcand_sum_pt)
+   part_logerel: np.log(part_energy/pfcand_sum_energy)
+   part_deltaR: np.hypot(part_deta, part_dphi)
+   part_d0: np.tanh(part_d0val)
+   part_dz: np.tanh(part_dzval)
+   part_isElectron: (part_pid == 11) | (part_pid == -11)
+   part_isMuon: (part_pid == 13) | (part_pid == -13)
+   part_isPhoton: part_pid == 22
+   part_isNeutralHadron: (part_charge == 0) & (part_pid != 22)
+   part_isChargedHadron: (part_charge != 0) & ~part_isElectron & ~part_isMuon
+
+   part_mask: ak.ones_like(part_energy)
+
+   # labels
+   gen_higgs_masses_label: >-
+      ak.where((gen_higgs1_mass < 40) | (gen_higgs1_mass > 200) | (gen_higgs2_mass < 40) | (gen_higgs2_mass > 200), ak.where(process_index == 0, 136, 137),
+         ak.where(((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50)), 0,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60)) | ((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 1,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70)) | ((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 2,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80)) | ((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 3,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90)) | ((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 4,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100)) | ((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 5,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110)) | ((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 6,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120)) | ((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 7,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130)) | ((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 8,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140)) | ((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 9,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)) | ((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 10,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 11,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 12,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 13,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 14,
+         ak.where((((gen_higgs1_mass >= 40) & (gen_higgs1_mass <= 50) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass >= 40) & (gen_higgs2_mass <= 50))), 15,
+         ak.where(((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60)), 16,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70)) | ((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 17,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80)) | ((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 18,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90)) | ((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 19,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100)) | ((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 20,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110)) | ((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 21,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120)) | ((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 22,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130)) | ((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 23,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140)) | ((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 24,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)) | ((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 25,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 26,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 27,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 28,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 29,
+         ak.where((((gen_higgs1_mass > 50) & (gen_higgs1_mass <= 60) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 50) & (gen_higgs2_mass <= 60))), 30,
+         ak.where(((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70)), 31,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80)) | ((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 32,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90)) | ((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 33,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100)) | ((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 34,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110)) | ((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 35,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120)) | ((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 36,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130)) | ((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 37,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140)) | ((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 38,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)) | ((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 39,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 40,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 41,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 42,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 43,
+         ak.where((((gen_higgs1_mass > 60) & (gen_higgs1_mass <= 70) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 60) & (gen_higgs2_mass <= 70))), 44,
+         ak.where(((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80)), 45,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90)) | ((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 46,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100)) | ((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 47,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110)) | ((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 48,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120)) | ((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 49,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130)) | ((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 50,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140)) | ((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 51,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)) | ((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 52,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 53,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 54,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 55,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 56,
+         ak.where((((gen_higgs1_mass > 70) & (gen_higgs1_mass <= 80) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 70) & (gen_higgs2_mass <= 80))), 57,
+         ak.where(((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90)), 58,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100)) | ((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 59,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110)) | ((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 60,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120)) | ((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 61,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130)) | ((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 62,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140)) | ((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 63,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)) | ((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 64,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 65,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 66,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 67,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 68,
+         ak.where((((gen_higgs1_mass > 80) & (gen_higgs1_mass <= 90) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 80) & (gen_higgs2_mass <= 90))), 69,
+         ak.where(((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100)), 70,
+         ak.where((((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110)) | ((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100))), 71,
+         ak.where((((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120)) | ((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100))), 72,
+         ak.where((((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130)) | ((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100))), 73,
+         ak.where((((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140)) | ((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100))), 74,
+         ak.where((((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)) | ((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100))), 75,
+         ak.where((((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100))), 76,
+         ak.where((((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100))), 77,
+         ak.where((((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100))), 78,
+         ak.where((((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100))), 79,
+         ak.where((((gen_higgs1_mass > 90) & (gen_higgs1_mass <= 100) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 90) & (gen_higgs2_mass <= 100))), 80,
+         ak.where(((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110)), 81,
+         ak.where((((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120)) | ((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110))), 82,
+         ak.where((((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130)) | ((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110))), 83,
+         ak.where((((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140)) | ((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110))), 84,
+         ak.where((((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)) | ((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110))), 85,
+         ak.where((((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110))), 86,
+         ak.where((((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110))), 87,
+         ak.where((((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110))), 88,
+         ak.where((((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110))), 89,
+         ak.where((((gen_higgs1_mass > 100) & (gen_higgs1_mass <= 110) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 100) & (gen_higgs2_mass <= 110))), 90,
+         ak.where(((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120)), 91,
+         ak.where((((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130)) | ((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120))), 92,
+         ak.where((((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140)) | ((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120))), 93,
+         ak.where((((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)) | ((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120))), 94,
+         ak.where((((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120))), 95,
+         ak.where((((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120))), 96,
+         ak.where((((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120))), 97,
+         ak.where((((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120))), 98,
+         ak.where((((gen_higgs1_mass > 110) & (gen_higgs1_mass <= 120) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 110) & (gen_higgs2_mass <= 120))), 99,
+         ak.where(((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130)), 100,
+         ak.where((((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140)) | ((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130))), 101,
+         ak.where((((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)) | ((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130))), 102,
+         ak.where((((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130))), 103,
+         ak.where((((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130))), 104,
+         ak.where((((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130))), 105,
+         ak.where((((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130))), 106,
+         ak.where((((gen_higgs1_mass > 120) & (gen_higgs1_mass <= 130) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 120) & (gen_higgs2_mass <= 130))), 107,
+         ak.where(((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140)), 108,
+         ak.where((((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)) | ((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140))), 109,
+         ak.where((((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140))), 110,
+         ak.where((((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140))), 111,
+         ak.where((((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140))), 112,
+         ak.where((((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140))), 113,
+         ak.where((((gen_higgs1_mass > 130) & (gen_higgs1_mass <= 140) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 130) & (gen_higgs2_mass <= 140))), 114,
+         ak.where(((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150)), 115,
+         ak.where((((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)) | ((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150))), 116,
+         ak.where((((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150))), 117,
+         ak.where((((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150))), 118,
+         ak.where((((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150))), 119,
+         ak.where((((gen_higgs1_mass > 140) & (gen_higgs1_mass <= 150) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 140) & (gen_higgs2_mass <= 150))), 120,
+         ak.where(((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160)), 121,
+         ak.where((((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)) | ((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160))), 122,
+         ak.where((((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160))), 123,
+         ak.where((((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160))), 124,
+         ak.where((((gen_higgs1_mass > 150) & (gen_higgs1_mass <= 160) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 150) & (gen_higgs2_mass <= 160))), 125,
+         ak.where(((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170)), 126,
+         ak.where((((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)) | ((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170))), 127,
+         ak.where((((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170))), 128,
+         ak.where((((gen_higgs1_mass > 160) & (gen_higgs1_mass <= 170) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 160) & (gen_higgs2_mass <= 170))), 129,
+         ak.where(((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180)), 130,
+         ak.where((((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)) | ((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180))), 131,
+         ak.where((((gen_higgs1_mass > 170) & (gen_higgs1_mass <= 180) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 170) & (gen_higgs2_mass <= 180))), 132,
+         ak.where(((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190)), 133,
+         ak.where((((gen_higgs1_mass > 180) & (gen_higgs1_mass <= 190) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)) | ((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 180) & (gen_higgs2_mass <= 190))), 134,
+         ak.where(((gen_higgs1_mass > 190) & (gen_higgs1_mass <= 200) & (gen_higgs2_mass > 190) & (gen_higgs2_mass <= 200)), 135,
+         136)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+   
+   # is_hh4b: gen_dihiggs_mass > 0
+   # is_qcd: gen_dihiggs_mass == 0
+
+preprocess:
+  ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+  method: manual
+  ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+  data_fraction: 0.5
+
+inputs:
+   pf_points:
+      length: 256
+      pad_mode: wrap
+      vars: 
+         - [part_eta, null]
+         - [part_phi, null]
+   pf_features:
+      length: 256
+      pad_mode: wrap
+      vars: 
+      ### [format 1]: var_name (no transformation)
+      ### [format 2]: [var_name, 
+      ###              subtract_by(optional, default=None, no transf. if preprocess.method=manual, auto transf. if preprocess.method=auto), 
+      ###              multiply_by(optional, default=1), 
+      ###              clip_min(optional, default=-5), 
+      ###              clip_max(optional, default=5), 
+      ###              pad_value(optional, default=0)]
+         - [part_pt_log, 1.7, 0.7]
+         - [part_e_log, 2.0, 0.7]
+         - [part_logptrel, -4.7, 0.7]
+         - [part_logerel, -4.7, 0.7]
+         - [part_deltaR, 0.2, 4.0]
+         - [part_charge, null]
+         - [part_isChargedHadron, null]
+         - [part_isNeutralHadron, null]
+         - [part_isPhoton, null]
+         - [part_isElectron, null]
+         - [part_isMuon, null]
+         - [part_d0, null]
+         - [part_d0err, 0, 1, 0, 1]
+         - [part_dz, null]
+         - [part_dzerr, 0, 1, 0, 1]
+         - [part_deta, null]
+         - [part_dphi, null]
+         - [part_eta, null]
+         - [part_phi, null]
+   pf_vectors:
+      length: 256
+      pad_mode: wrap
+      vars: 
+         - [part_px, null]
+         - [part_py, null]
+         - [part_pz, null]
+         - [part_energy, null]
+   pf_mask:
+      length: 256
+      pad_mode: constant
+      vars: 
+         - [part_mask, null]
+
+labels:
+   ### type can be `simple`, `custom`
+   ### [option 1] use `simple` for binary/multi-class classification, then `value` is a list of 0-1 labels
+   ### [option 2] otherwise use `custom` to define the label, then `value` is a map
+   type: custom
+   value: 
+      truth_label: gen_higgs_masses_label

@@ -17,14 +17,32 @@ if [[ "$current_dir" != *"weaver-core/weaver" ]]; then
     exit 1
 fi
 
-# modified to include ttbar (gghh vs qcd and ttbar)
+NDIV=50 # 10 or 50
+trainset_gghh=$(ls -v ${DATADIR}/sm_4j/HH4b_2HDM_H3VAR_H1H2_40to200_merged_ntuple/*.root | head -n $(($(ls -1 ${DATADIR}/sm_4j/HH4b_2HDM_H3VAR_H1H2_40to200_merged_ntuple | wc -l) / $NDIV)) | sed 's/^/gghh:/' | paste -sd' ' -)
+trainset_qcd=$(ls -v ${DATADIR}/sm_4j/QCD_DelphesHH4JTrig_merged_ntuple/*.root | head -n $(($(ls -1 ${DATADIR}/sm_4j/QCD_DelphesHH4JTrig_merged_ntuple | wc -l) / $NDIV)) | sed 's/^/qcd:/' | paste -sd' ' -)
+trainset_ttbar=$(ls -v ${DATADIR}/sm_incl_derived_4j3bor2b/TTbar_ntuple/*.root | head -n $(($(ls -1 ${DATADIR}/sm_incl_derived_4j3bor2b/TTbar_ntuple | wc -l) / $NDIV)) | sed 's/^/ttbar:/' | paste -sd' ' -)
+
+if [ $NDIV -eq 50 ]; then
+    samples_per_epoch=$((1000 * 1024 / $NGPUS))
+    samples_per_epoch_val=$((250 * 1024 / $NGPUS))
+    num_epochs=40
+elif [ $NDIV -eq 10 ]; then
+    samples_per_epoch=$((4000 * 1024 / $NGPUS))
+    samples_per_epoch_val=$((1000 * 1024 / $NGPUS))
+    num_epochs=40
+elif [ $NDIV -eq 1 ]; then
+    samples_per_epoch=$((10000 * 1024 / $NGPUS))
+    samples_per_epoch_val=$((2500 * 1024 / $NGPUS))
+    num_epochs=80
+else
+    echo "NDIV must be 50, 10 or 1"
+    exit 1
+fi
+
 ARG="--network-config networks/pheno2/example_ParticleTransformer.py -o num_classes 2 -o embed_dims [256,1024,256] -o pair_embed_dims [64,64,64] -o num_heads 16 -o fc_params [(1024,0.1)] \
---use-amp --batch-size 256 --start-lr 2.5e-4 --samples-per-epoch $((10000 * 1024 / $NGPUS)) --samples-per-epoch-val $((2500 * 1024 / $NGPUS)) --num-epochs 80 --optimizer ranger \
+--use-amp --batch-size 256 --start-lr 2.5e-4 --samples-per-epoch $samples_per_epoch --samples-per-epoch-val $samples_per_epoch_val --num-epochs $num_epochs --optimizer ranger \
 --num-workers 5 --fetch-step 1.0 --data-split-num 500 \
---data-train \
-gghh:${DATADIR}/sm_4j/HH4b_2HDM_H3VAR_H1H2_40to200_merged_ntuple/*.root \
-qcd:${DATADIR}/sm_4j/QCD_DelphesHH4JTrig_merged_ntuple/*.root \
-ttbar:${DATADIR}/sm_incl_derived_4j3bor2b/TTbar_ntuple/*.root \
+--data-train $trainset_gghh $trainset_qcd $trainset_ttbar
 --data-config $config \
 --model-prefix model/${PREFIX}/net \
 --predict-output predict/$PREFIX/pred.root "
